@@ -547,7 +547,7 @@ const C = {
   crystalBoss: 3,        // Kristalle pro besiegtem Boss
 };
 const SAVE_KEY = 'ringwache.v2';
-const VERSION = 6;   // von Hand bei jeder Änderung um 1 erhöhen
+const VERSION = 7;   // von Hand bei jeder Änderung um 1 erhöhen
 
 /* Schwierigkeitsstufen: Multiplikatoren auf das Grundspiel.
    fallback = Wellen zurück beim Schildbruch. */
@@ -859,6 +859,11 @@ const val = id => UP[id].val(S.lv[id]);
 // Upgrades nach einem Neustart: 1 % je Stern, mit abnehmendem Ertrag.
 const costDiscount = () => 1 / (1 + (S.st.starsTotal || 0) * 0.01);
 const cost = (u, l) => Math.ceil(u.base * Math.pow(u.grow, l) * costDiscount());
+// Zusätzlich zum Rabatt: dauerhafte, mit jedem Neustart wachsende Angriffs-
+// und Verteidigungsboni, 0,2 % je insgesamt gesammeltem Stern.
+const PRESTIGE_ATK_RATE = 0.002, PRESTIGE_DEF_RATE = 0.002;
+const prestigeAtkBonus = () => (S.st.starsTotal || 0) * PRESTIGE_ATK_RATE;
+const prestigeDefBonus = () => (S.st.starsTotal || 0) * PRESTIGE_DEF_RATE;
 const achBonus = key => S.done.reduce((s, id) => {
   const a = ACHS.find(x => x.id === id);
   return s + (a && a[key] ? a[key] : 0);
@@ -870,14 +875,14 @@ const chalBonus = key => S.chDone.reduce((s, id) => {
 }, 0);
 const tal = id => S.tal[id] || 0;
 
-const dmgMult  = () => (1 + .08 * tal('power')) * (1 + achBonus('dmg'))  * (1 + chalBonus('dmg'));
+const dmgMult  = () => (1 + .08 * tal('power')) * (1 + achBonus('dmg'))  * (1 + chalBonus('dmg')) * (1 + prestigeAtkBonus());
 const goldMult = () => (1 + .08 * tal('greed')) * (1 + achBonus('gold')) * (1 + chalBonus('gold')) * (1 + S.sp.gold * .25);
 const baseDamage = () => val('dmg') * dmgMult();
 // Eigener Schadenswert für Klicks: hängt bewusst nicht von val('dmg')
 // ab, damit Turm-Schaden ("Schuss") und Klick-Schaden getrennt bleiben.
 const clickDamage = () => val('click') * dmgMult();
 const fireRate = () => val('rate') * (1 + .04 * tal('rapid'));
-const shieldMax = () => Math.round(UP.shield.val(S.lv.shield) * (1 + .1 * tal('bulwark')));
+const shieldMax = () => Math.round(UP.shield.val(S.lv.shield) * (1 + .1 * tal('bulwark')) * (1 + prestigeDefBonus()));
 const shieldRegen = () => (D().regen + S.sp.shield * .005) * (1 + .2 * tal('bulwark'));
 // Feste Ringauffüllung in Punkten/Sekunde, zusätzlich zur prozentualen Regeneration
 const shieldRegenFlat = () => val('shieldRegen') * (1 + .2 * tal('bulwark'));
@@ -3534,14 +3539,18 @@ function renderUI(){
   $('pTitle').textContent = `Sterne: ${fmt(S.stars)} frei, ${fmt(spent)} verteilt`;
   if (gain > 0){
     // Genaue Vorher/Nachher-Prozente statt einer vagen Ankündigung: wie viel
-    // günstiger Verbesserungen durch die zusätzlichen Sterne werden.
+    // günstiger, stärker und widerstandsfähiger die zusätzlichen Sterne machen.
+    const totalAfter = S.st.starsTotal + gain;
     const discountNow = (1 - costDiscount()) * 100;
-    const discountAfter = (1 - 1 / (1 + (S.st.starsTotal + gain) * 0.01)) * 100;
-    $('pDesc').textContent = `Welle ${S.bestWave} bringt ${gain} Sterne. `
-      + `Verbesserungen werden dadurch insgesamt ${dec(discountAfter)} % günstiger `
-      + `(statt bisher ${dec(discountNow)} %, also +${dec(discountAfter - discountNow)} Prozentpunkte). `
-      + `Dafür gehen Gold sowie alle Verbesserungs- und Erweiterungsstufen dieser Runde verloren `
-      + `(Sterne-Talente, Kristalle und Erfolge bleiben erhalten).`;
+    const discountAfter = (1 - 1 / (1 + totalAfter * 0.01)) * 100;
+    const atkNow = prestigeAtkBonus() * 100, atkAfter = totalAfter * PRESTIGE_ATK_RATE * 100;
+    const defNow = prestigeDefBonus() * 100, defAfter = totalAfter * PRESTIGE_DEF_RATE * 100;
+    $('pDesc').textContent = `Welle ${S.bestWave} bringt ${gain} Sterne. Dauerhaft:`
+      + ` Verbesserungen ${dec(discountAfter)} % günstiger (statt ${dec(discountNow)} %, +${dec(discountAfter - discountNow)} Pp.),`
+      + ` Angriff ${dec(atkAfter)} % stärker (statt ${dec(atkNow)} %, +${dec(atkAfter - atkNow)} Pp.),`
+      + ` Schild ${dec(defAfter)} % größer (statt ${dec(defNow)} %, +${dec(defAfter - defNow)} Pp.).`
+      + ` Dafür gehen Gold sowie alle Verbesserungs- und Erweiterungsstufen dieser Runde verloren`
+      + ` (Sterne-Talente, Kristalle und Erfolge bleiben erhalten).`;
   } else {
     $('pDesc').textContent = `Ab Welle ${C.prestigeMinWave} gibt es Sterne. Details im Reiter Sterne.`;
   }
