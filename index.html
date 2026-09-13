@@ -360,7 +360,7 @@ aside{position:fixed;left:0;right:0;bottom:0;z-index:7;width:100%;max-width:980p
             <div class="meta"><span id="hpLabel">Schild 10 / 10</span></div>
             <div class="meta rush-hint" id="rushHint">tippen für nächste Welle</div>
             </button>
-            <div class="glass rank-badge" id="rankBadge" title="Rang: 100 Punkte pro Abschuss-Rang, ein Schildbruch kostet 10 Ränge">
+            <div class="glass rank-badge" id="rankBadge" title="Rang: 100 Punkte pro Abschuss-Rang, +0,5 % Angriff und Schild pro Rang. Nicht dauerhaft: ein Schildbruch kostet 10 Ränge und damit anteilig diesen Bonus.">
               <span class="rank-badge-ic" id="rankIcon"></span>
               <div class="rank-badge-text">
                 <span class="rank-badge-num">Rang <b id="rank">1</b></span>
@@ -547,7 +547,7 @@ const C = {
   crystalBoss: 3,        // Kristalle pro besiegtem Boss
 };
 const SAVE_KEY = 'ringwache.v2';
-const VERSION = 7;   // von Hand bei jeder Änderung um 1 erhöhen
+const VERSION = 8;   // von Hand bei jeder Änderung um 1 erhöhen
 
 /* Schwierigkeitsstufen: Multiplikatoren auf das Grundspiel.
    fallback = Wellen zurück beim Schildbruch. */
@@ -828,7 +828,7 @@ const S = {
 };
 const G = {
   enemies:[], bullets:[], parts:[], texts:[], ripples:[], flashes:[], waves:[], grid:new Map(),
-  toSpawn:0, spawnT:0, spawnLeft:0, spawnMults:[], pendingPicks:1, pickRoundTotal:1, bossPending:false, pause:0, waveTotal:0, waveKilled:0,
+  toSpawn:0, spawnT:0, spawnLeft:0, spawnMults:[], waveGoldEarned:0, pendingPicks:1, pickRoundTotal:1, bossPending:false, pause:0, waveTotal:0, waveKilled:0,
   cd:0, hp:10, shake:0, hitFlash:0, spin:0, t:0,
   acc:0, accT:0, ips:0, shots:0, hits:0, drones:[],
   autoT:0, tab:'spec', shopTab:'atk', panel:false, userPause:false, queued:0, pendGold:0, pendCry:0, syn:[], dend:[],
@@ -864,6 +864,11 @@ const cost = (u, l) => Math.ceil(u.base * Math.pow(u.grow, l) * costDiscount());
 const PRESTIGE_ATK_RATE = 0.002, PRESTIGE_DEF_RATE = 0.002;
 const prestigeAtkBonus = () => (S.st.starsTotal || 0) * PRESTIGE_ATK_RATE;
 const prestigeDefBonus = () => (S.st.starsTotal || 0) * PRESTIGE_DEF_RATE;
+// Rang-Bonus: anders als die obigen Boni NICHT dauerhaft - ein Schildbruch
+// kostet Ränge (RANK_LOSS) und damit anteilig auch diesen Bonus wieder.
+const RANK_ATK_RATE = 0.005, RANK_DEF_RATE = 0.005;
+const rankAtkBonus = () => S.rank * RANK_ATK_RATE;
+const rankDefBonus = () => S.rank * RANK_DEF_RATE;
 const achBonus = key => S.done.reduce((s, id) => {
   const a = ACHS.find(x => x.id === id);
   return s + (a && a[key] ? a[key] : 0);
@@ -875,14 +880,14 @@ const chalBonus = key => S.chDone.reduce((s, id) => {
 }, 0);
 const tal = id => S.tal[id] || 0;
 
-const dmgMult  = () => (1 + .08 * tal('power')) * (1 + achBonus('dmg'))  * (1 + chalBonus('dmg')) * (1 + prestigeAtkBonus());
+const dmgMult  = () => (1 + .08 * tal('power')) * (1 + achBonus('dmg'))  * (1 + chalBonus('dmg')) * (1 + prestigeAtkBonus()) * (1 + rankAtkBonus());
 const goldMult = () => (1 + .08 * tal('greed')) * (1 + achBonus('gold')) * (1 + chalBonus('gold')) * (1 + S.sp.gold * .25);
 const baseDamage = () => val('dmg') * dmgMult();
 // Eigener Schadenswert für Klicks: hängt bewusst nicht von val('dmg')
 // ab, damit Turm-Schaden ("Schuss") und Klick-Schaden getrennt bleiben.
 const clickDamage = () => val('click') * dmgMult();
 const fireRate = () => val('rate') * (1 + .04 * tal('rapid'));
-const shieldMax = () => Math.round(UP.shield.val(S.lv.shield) * (1 + .1 * tal('bulwark')) * (1 + prestigeDefBonus()));
+const shieldMax = () => Math.round(UP.shield.val(S.lv.shield) * (1 + .1 * tal('bulwark')) * (1 + prestigeDefBonus()) * (1 + rankDefBonus()));
 const shieldRegen = () => (D().regen + S.sp.shield * .005) * (1 + .2 * tal('bulwark'));
 // Feste Ringauffüllung in Punkten/Sekunde, zusätzlich zur prozentualen Regeneration
 const shieldRegenFlat = () => val('shieldRegen') * (1 + .2 * tal('bulwark'));
@@ -1031,6 +1036,7 @@ function startWave(){
   G.bossPending = boss;
   G.toSpawn = waveCount();
   G.waveTotal = G.toSpawn; G.waveKilled = 0; G.queued = 0;
+  G.waveGoldEarned = 0;
   // Regulär gestartete Welle: kein Vorzieh-Bonus auf ihr Gold.
   G.spawnMults = new Array(G.toSpawn).fill(1);
   // Alle Gegner einer Welle müssen innerhalb dieses Fensters eintreffen.
@@ -1112,10 +1118,17 @@ function payout(){
 }
 
 function waveCleared(){
+  const maxRushMult = G.queued + 1;          // höchste Vorzieh-Vervielfachung in diesem Schub
+  const goldEarned = G.waveGoldEarned;
   G.queued = 0;
   payout();                                  // jetzt gibt es die Beute
   const wasBoss = S.wave % C.bossEvery === 0;
-  logHistory(`Welle ${S.wave} gewonnen`, 'win');
+  logHistory(
+    maxRushMult > 1
+      ? `Welle ${S.wave} gewonnen: +${fmt(goldEarned)} Gold (bis ×${maxRushMult} durch Vorziehen)`
+      : `Welle ${S.wave} gewonnen: +${fmt(goldEarned)} Gold`,
+    'win'
+  );
   G.goldRain = null;                         // ein etwaiger Goldregen ist jetzt ausgezahlt
   S.cleared = S.wave;                        // alles aus diesem Schub ist besiegt
   S.wave++;
@@ -1540,6 +1553,7 @@ function kill(e){
   const now = r * (1 - hold);
   G.pendGold += r * hold;
   S.gold += now; S.st.gold += now;
+  G.waveGoldEarned += r;
   G.acc += r;
   S.st.kills++;
   gainRankPoints(1);
@@ -2684,6 +2698,12 @@ function buildStats(){
       ['Aufgaben geschafft', `${S.chDone.length} / ${CHALLENGES.length}`],
       ['Erfolge', `${S.done.length} / ${ACHS.length}`],
     ]],
+    ['Boni auf Angriff & Schild', [
+      ['Sterne-Talente – dauerhaft', `+${dec(tal('power') * 8)} % Angriff, +${dec(tal('bulwark') * 10)} % Schild`, true],
+      ['Erfolge & Aufgaben – dauerhaft', `+${dec((achBonus('dmg') + chalBonus('dmg')) * 100)} % Angriff`],
+      ['Neustart-Sterne – dauerhaft', `+${dec(prestigeAtkBonus() * 100)} % Angriff, +${dec(prestigeDefBonus() * 100)} % Schild`],
+      ['Aktueller Rang – verlierbar bei Schildbruch', `+${dec(rankAtkBonus() * 100)} % Angriff, +${dec(rankDefBonus() * 100)} % Schild`],
+    ]],
     ['Kampf', [
       ['Zerstörte Gegner', fmt(st.kills), true],
       ['Davon Bosse', fmt(st.bosses)],
@@ -3490,7 +3510,7 @@ function renderUI(){
   } else cq.hidden = true;
   const q = $('queued');
   q.hidden = G.queued <= 0;
-  q.textContent = `+${G.queued} ungesichert`;
+  q.textContent = G.queued > 0 ? `+${G.queued} ungesichert · bis ×${G.queued + 1} Gold` : '';
 
   const total = G.waveTotal || 1;
   $('waveFill').style.width = clamp(G.waveKilled / total * 100, 0, 100) + '%';
