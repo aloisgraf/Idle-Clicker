@@ -57,6 +57,9 @@ canvas{display:block;width:100%;height:100%;cursor:crosshair;touch-action:manipu
 .rank-badge-num{font-size:.68rem;color:var(--muted);font-weight:600}
 .rank-badge-num b{font-variant-numeric:tabular-nums;font-size:1.05rem;color:var(--ink)}
 .rank-badge-name{font-size:.88rem;font-weight:700;color:var(--rc)}
+.rankbar{width:100%;min-width:90px;margin-top:5px}
+.rankbar i{background:var(--rc)}
+.rank-badge-pts{font-size:.62rem;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
 .sub{color:var(--muted);font-size:.74rem;margin-top:3px;font-variant-numeric:tabular-nums;display:flex;gap:9px;flex-wrap:wrap;line-height:1.35}
 .sub b{color:var(--ink);font-weight:600}
 
@@ -81,7 +84,9 @@ canvas{display:block;width:100%;height:100%;cursor:crosshair;touch-action:manipu
 .paused{font-size:.8rem;font-weight:600;color:var(--core);border:1px solid rgba(255,200,87,.45);border-radius:6px;padding:2px 7px;vertical-align:middle;margin-left:6px}
 .wave-top{display:flex;align-items:baseline;justify-content:flex-start;gap:8px}
 .wave-num{font-size:1.05rem;font-weight:700;line-height:1}
+.wave-best{font-size:.66rem;font-weight:600;color:var(--muted);white-space:nowrap}
 .tag{font-size:.62rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 5px;border-radius:5px;background:rgba(255,90,110,.18);color:var(--foe);border:1px solid rgba(255,90,110,.4)}
+.tag.goldrain{background:rgba(255,200,87,.18);color:var(--core);border-color:rgba(255,200,87,.45)}
 .bar{height:4px;border-radius:2px;background:rgba(255,255,255,.1);margin-top:5px;overflow:hidden}
 .bar i{display:block;height:100%;border-radius:3px}
 .bar.wavebar i{background:var(--acc)}
@@ -144,6 +149,8 @@ canvas{display:block;width:100%;height:100%;cursor:crosshair;touch-action:manipu
 .history-list .hl-win{color:var(--acc)}
 .history-list .hl-loss{color:var(--foe)}
 .history-list .hl-dmg{color:var(--muted)}
+.history-list .hl-ext{color:#7ef0ff}
+.history-list .hl-sub{margin-left:14px;opacity:.8;font-size:.92em}
 
 .toast{position:absolute;left:50%;top:18%;transform:translate(-50%,-50%);font-size:1.1rem;font-weight:600;padding:10px 20px;border-radius:999px;background:rgba(11,10,31,.9);border:1px solid var(--line-2);opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;max-width:92%;box-shadow:var(--shadow)}
 .toast.show{opacity:1}
@@ -284,10 +291,15 @@ aside{position:fixed;left:0;right:0;bottom:0;z-index:7;width:100%;max-width:980p
 .diff-cards strong{font-size:1.08rem;font-weight:600}
 .diff-cards small{color:var(--muted);font-size:.8rem;line-height:1.35}
 .diff-cards em{font-style:normal;color:var(--gold);font-size:.79rem;font-weight:600}
-.ext-cards button{text-align:center;justify-items:center}
+.ext-cards button{text-align:center;justify-items:center;position:relative}
 .ext-cards .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(126,240,255,.14);color:#7ef0ff}
 .ext-cards .ic svg{width:19px;height:19px}
 .ext-cards strong,.ext-cards small{max-width:100%;overflow-wrap:break-word}
+.ext-cards .tier-tag{position:absolute;top:8px;right:8px;font-size:.58rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,.12);font-style:normal}
+.ext-cards button.tier-super,.ext-cards button.tier-super:hover{border-color:#4ea8ff;box-shadow:0 0 16px rgba(78,168,255,.28)}
+.ext-cards button.tier-super .tier-tag{background:rgba(78,168,255,.28);color:#bfe0ff}
+.ext-cards button.tier-ultra,.ext-cards button.tier-ultra:hover{border-color:var(--core);box-shadow:0 0 18px rgba(255,200,87,.4)}
+.ext-cards button.tier-ultra .tier-tag{background:rgba(255,200,87,.3);color:var(--core)}
 
 @media (max-width:820px){
   .hud-bot{margin-bottom:44px}
@@ -300,6 +312,8 @@ aside{position:fixed;left:0;right:0;bottom:0;z-index:7;width:100%;max-width:980p
   .rank-badge{padding:6px 9px;gap:6px}
   .rank-badge-ic{width:24px;height:24px}
   .rank-badge-name{display:none}
+  .rankbar{min-width:56px}
+  .rank-badge-pts{display:none}
   .stats-box{display:none}
   .abil{gap:5px}
   .ab{width:46px;padding:5px 3px 4px}
@@ -334,7 +348,9 @@ aside{position:fixed;left:0;right:0;bottom:0;z-index:7;width:100%;max-width:980p
               <span class="tag chal" id="chalTag" hidden></span>
               <span class="tag" id="queued" hidden>+1</span>
               <span class="tag" id="boss" hidden>Boss</span>
+              <span class="tag goldrain" id="goldRainTag" hidden></span>
               <span class="wave-num" id="wave">Welle 1</span>
+              <span class="wave-best" id="waveBest">Max 1</span>
               <span class="paused" id="pausedTag" hidden>Pause</span>
             </div>
             <div class="bar wavebar" aria-hidden="true"><i id="waveFill" style="width:0"></i></div>
@@ -348,6 +364,8 @@ aside{position:fixed;left:0;right:0;bottom:0;z-index:7;width:100%;max-width:980p
               <div class="rank-badge-text">
                 <span class="rank-badge-num">Rang <b id="rank">1</b></span>
                 <span class="rank-badge-name" id="rankName">Rekrut I</span>
+                <div class="bar rankbar" aria-hidden="true"><i id="rankFill" style="width:0"></i></div>
+                <span class="rank-badge-pts" id="rankPtsLabel">0 / 100</span>
               </div>
             </div>
           </div>
@@ -524,7 +542,7 @@ const C = {
   crystalBoss: 3,        // Kristalle pro besiegtem Boss
 };
 const SAVE_KEY = 'ringwache.v2';
-const VERSION = 2;   // von Hand bei jeder Änderung um 1 erhöhen
+const VERSION = 3;   // von Hand bei jeder Änderung um 1 erhöhen
 
 /* Schwierigkeitsstufen: Multiplikatoren auf das Grundspiel.
    fallback = Wellen zurück beim Schildbruch. */
@@ -742,11 +760,16 @@ const EXT = {
     cdBase:25, cdMin:6,
     pwBase:14, pwStep:.45, pwMaxLv:10, extraMax:3,
     tracks:['cd','pw','extra'] },
+  // Synapsenblitz reicht 150px über die normale Reichweite hinaus (per
+  // "reach"-Ausbau weiter steigerbar) und kann per "jump"-Ausbau von
+  // seinem Ziel aus zu weiteren Zielen überspringen (siehe boltRange/
+  // BOLT_JUMP_RADIUS in updateExtensions).
   bolt: { id:'bolt', name:'Synapsenblitz', short:'Blitz', icon:'bolt',
-    unlockDesc:'Ein Blitz springt in regelmäßigen Abständen zu einem Gegner in Reichweite.',
+    unlockDesc:'Ein Blitz springt in regelmäßigen Abständen zu einem Gegner bis 150px über deine Reichweite hinaus.',
     cdBase:25, cdMin:6,
     pwBase:26, pwStep:.5, pwMaxLv:10, extraMax:3,
-    tracks:['pw','cd','extra'] },
+    reachStep:20, reachMaxLv:8, jumpMax:3,
+    tracks:['pw','cd','extra','reach','jump'] },
   spiral: { id:'spiral', name:'Synapsenrotation', short:'Rotation', icon:'spiral',
     unlockDesc:'Feuert ununterbrochen rotierende Geschosse ab, die sich spiralförmig nach außen ausbreiten.',
     cdBase:2, cdMin:.2,
@@ -788,7 +811,8 @@ const S = {
   lv: Object.fromEntries(UPGRADES.map(u => [u.id, 0])),
   sp: Object.fromEntries(SPECIALS.map(x => [x.id, 0])),
   tal: Object.fromEntries(TALENTS.map(t => [t.id, 0])),
-  ext: Object.fromEntries(Object.keys(EXT).map(id => [id, { lv:0, pw:0, cd:0, extra:0 }])),
+  ext: Object.fromEntries(Object.keys(EXT).map(id => [id, { lv:0, pw:0, cd:0, extra:0, reach:0, jump:0 }])),
+  ringLv: 0,
   chDone: [], ch: null, chTime: 0,
   done: [],
   st: { kills: 0, bosses: 0, time: 0, clicks: 0, clickKills: 0, shots: 0, hits: 0,
@@ -801,6 +825,7 @@ const G = {
   cd:0, hp:10, shake:0, hitFlash:0, spin:0, t:0,
   acc:0, accT:0, ips:0, shots:0, hits:0, drones:[],
   autoT:0, tab:'spec', shopTab:'atk', panel:false, userPause:false, queued:0, pendGold:0, pendCry:0, syn:[], dend:[],
+  goldRain: null,
   ext:{ shock:{cd:0}, bolt:{cd:0}, spiral:{cd:0, angle:0}, dirshot:{cd:0}, drone:{cd:0}, nuke:{cd:0} },
   shocks:[], bolts:[], spiralShots:[], beams:[], droneShots:[], history:[],
 };
@@ -869,6 +894,11 @@ const extCdAt = (id, lv) => {
 };
 const extPower   = id => extPowerAt(id, S.ext[id].pw);
 const extCd      = id => extCdAt(id, S.ext[id].cd);
+// Reichweite des Synapsenblitzes: 150px über die normale Reichweite hinaus,
+// plus Bonus aus dem "reach"-Ausbau.
+const boltRange = () => rangePx() + 150 + EXT.bolt.reachStep * S.ext.bolt.reach;
+// Suchradius für Kettensprünge: vom zuletzt getroffenen Ziel aus, nicht vom Kern.
+const BOLT_JUMP_RADIUS = 200;
 function shuffleInPlace(arr){
   for (let i = arr.length - 1; i > 0; i--){
     const j = Math.floor(Math.random() * (i + 1));
@@ -936,6 +966,11 @@ const bgx = bg.getContext('2d');
 let W = 0, H = 0, CX = 0, CY = 0;
 const minDim = () => Math.min(W, H) || 600;
 const rangePx = () => val('range') * minDim() * (1 + S.sp.range * .2) * (1 + .05 * tal('reach'));
+// Erweiterungsring: äußere Grenze jenseits der normalen Reichweite, bis zu
+// der Schockwellen laufen und in der sich Begleitschiffe bewegen. Startet
+// bei +25px, je Stufe (per Erweiterungskarte) weitere +10px.
+const RING_BASE = 25, RING_STEP = 10, RING_MAX_LV = 15;
+const extRingPx = () => rangePx() + RING_BASE + RING_STEP * S.ringLv;
 
 function resize(){
   const r = canvas.getBoundingClientRect();
@@ -1063,6 +1098,7 @@ function waveCleared(){
   G.queued = 0;
   payout();                                  // jetzt gibt es die Beute
   logHistory(`Welle ${S.wave} gewonnen`, 'win');
+  G.goldRain = null;                         // ein etwaiger Goldregen ist jetzt ausgezahlt
   S.cleared = S.wave;                        // alles aus diesem Schub ist besiegt
   S.wave++;
   S.bestWave = Math.max(S.bestWave, S.wave);
@@ -1084,13 +1120,14 @@ function damageBase(amount, e){
     const lost = S.wave - back;
     const lostGold = G.pendGold, lostCry = G.pendCry;
     G.pendGold = 0; G.pendCry = 0;
+    G.goldRain = null;                         // ein etwaiger Goldregen ist mit der Welle verloren
     S.st.lostGold = (S.st.lostGold || 0) + lostGold;
     logHistory(`Welle ${S.wave} verloren`, 'loss');
-    if (lostGold || lostCry) logHistory(`${fmt(lostGold)} Gold${lostCry ? ` und ${lostCry} Kristalle` : ''} verloren`, 'loss');
-    logHistory(`Zurückgefallen auf Welle ${back}`, 'loss');
+    if (lostGold || lostCry) logHistory(`${fmt(lostGold)} Gold${lostCry ? ` und ${lostCry} Kristalle` : ''} verloren`, 'loss', true);
+    logHistory(`Zurückgefallen auf Welle ${back}`, 'loss', true);
     const oldRank = S.rank;
     S.rank = Math.max(1, S.rank - RANK_LOSS);
-    if (S.rank < oldRank) logHistory(`${oldRank - S.rank} Rang${oldRank - S.rank > 1 ? 'e' : ''} verloren`, 'loss');
+    if (S.rank < oldRank) logHistory(`${oldRank - S.rank} ${oldRank - S.rank > 1 ? 'Ränge' : 'Rang'} verloren`, 'loss', true);
     S.wave = back;
     S.cleared = Math.max(0, back - 1);
     G.enemies.length = 0; G.bullets.length = 0; G.toSpawn = 0; G.bossPending = false;
@@ -1211,32 +1248,35 @@ function shoot(x, y, dmg, multi, chain, core){
   return fired > 0;
 }
 
-// Begleitschiff sucht sein Ziel unabhängig vom Kern: einfach das nächste
-// ungetarnte Ziel in der eigenen Nähe, egal wo sich das Schiff befindet.
-function droneTarget(d, radius){
+// Sucht das nächste ungetarnte Ziel um einen beliebigen Punkt herum, unabhängig
+// vom Kern. Dient sowohl den Begleitschiffen (eigene Position) als auch den
+// Kettensprüngen des Synapsenblitzes (Position des zuletzt getroffenen Ziels).
+function nearTarget(x, y, radius, exclude){
   let best = null, bd = Infinity;
-  forEachNear(d.x, d.y, radius, e => {
-    if (e.dead || e.cloaked) return;
-    const dx = e.x - d.x, dy = e.y - d.y, d2 = dx*dx + dy*dy;
+  forEachNear(x, y, radius, e => {
+    if (e.dead || e.cloaked || (exclude && exclude.includes(e))) return;
+    const dx = e.x - x, dy = e.y - y, d2 = dx*dx + dy*dy;
     if (d2 > radius * radius) return;
     if (d2 < bd){ bd = d2; best = e; }
   });
   return best;
 }
-// Begleitschiffe bewegen sich frei außerhalb der Reichweite und feuern
-// eigenständig auf Ziele in ihrer Nähe (Erweiterung "drone").
+const DRONE_ATTACK_RADIUS = 170;
+// Begleitschiffe bewegen sich frei zwischen dem äußeren Ring und dem
+// Erweiterungsring und feuern eigenständig auf Ziele in ihrer Nähe
+// (Erweiterung "drone").
 function updateDrones(dt){
   const want = extOwned('drone') ? 1 + S.ext.drone.extra : 0;
   while (G.drones.length < want){
-    const ang = Math.random() * TAU, r = rangePx() + 70 + Math.random() * 60;
+    const ang = Math.random() * TAU, r = rangePx() + Math.random() * (extRingPx() - rangePx());
     G.drones.push({ x: CX + Math.cos(ang) * r, y: CY + Math.sin(ang) * r, a: ang, wander: Math.random() * TAU, cd: Math.random() * .5, flash: 0 });
   }
   if (G.drones.length > want) G.drones.length = want;
-  const inner = rangePx() + 40, outer = rangePx() + 190, speed = 95;
+  const inner = rangePx(), outer = extRingPx(), speed = 95;
   for (const d of G.drones){
     // Sanfter Zufallsflug statt starrer Kreisbahn, mit weichem Zurücklenken
     // ins erlaubte Band, sobald das Schiff zu nah an den Kern kommt oder
-    // zu weit hinausfliegt.
+    // über den Erweiterungsring hinausfliegt.
     d.wander += (Math.random() - .5) * 1.8 * dt;
     let dx = Math.cos(d.wander), dy = Math.sin(d.wander);
     const dist = Math.hypot(d.x - CX, d.y - CY) || 1;
@@ -1251,7 +1291,7 @@ function updateDrones(dt){
 
     d.cd = Math.max(0, d.cd - dt);
     if (d.cd <= 0 && !chRule('noDrone')){
-      const t = droneTarget(d, 170);
+      const t = nearTarget(d.x, d.y, DRONE_ATTACK_RADIUS);
       if (t){
         G.droneShots.push({ path: lightningPath(d.x, d.y, t.x, t.y), life:.22, life0:.22 });
         hitEnemy(t, extPower('drone'), false);
@@ -1284,7 +1324,7 @@ function updateExtensions(dt){
   // Superschockwelle: kein Automatik-Angriff, läuft nur ihre Abklingzeit
   // herunter, ausgelöst wird sie manuell per Klick (siehe triggerNuke).
   if (extOwned('nuke') && G.ext.nuke.cd > 0) G.ext.nuke.cd = Math.max(0, G.ext.nuke.cd - dt);
-  // Schockwelle: 1+extra Ringe hintereinander, jeder läuft vom Kern bis zum Rand der Reichweite
+  // Schockwelle: 1+extra Ringe hintereinander, jeder läuft vom Kern bis zum Erweiterungsring
   if (extOwned('shock')){
     G.ext.shock.cd -= dt;
     if (G.ext.shock.cd <= 0){
@@ -1299,29 +1339,42 @@ function updateExtensions(dt){
   for (let i = G.shocks.length - 1; i >= 0; i--){
     const s = G.shocks[i];
     if (s.delay > 0){ s.delay -= dt; continue; }   // wartet, bis der vorige Ring dran war
-    s.r += rangePx() / 0.6 * dt;         // durchquert die Reichweite in 0,6s
+    const ER = extRingPx();
+    s.r += ER / 0.6 * dt;                // durchquert den Erweiterungsring in 0,6s
     for (const e of G.enemies){
       if (e.dead || e.cloaked || s.hit.has(e) || Math.abs(e.dist - s.r) > 16) continue;
       s.hit.add(e);
       hitEnemy(e, extPower('shock'), false);
     }
-    if (s.r > rangePx() + 20) G.shocks.splice(i, 1);
+    if (s.r > ER + 20) G.shocks.splice(i, 1);
   }
 
-  // Synapsenblitz: trifft 1+extra Gegner in Reichweite gleichzeitig
+  // Synapsenblitz: trifft 1+extra Gegner gleichzeitig bis 150px über die
+  // Reichweite hinaus (+ Ausbau); von jedem Treffer aus kann er zusätzlich
+  // per "jump"-Ausbau zu weiteren, nahen Zielen überspringen.
   if (extOwned('bolt')){
     G.ext.bolt.cd -= dt;
     if (G.ext.bolt.cd <= 0){
       G.ext.bolt.cd = extCd('bolt');
-      const R = rangePx();
+      const BR = boltRange();
       const targets = [];
-      forEachNear(CX, CY, R + 40, e => { if (!e.dead && !e.cloaked && e.dist <= R + e.r) targets.push(e); });
+      forEachNear(CX, CY, BR + 40, e => { if (!e.dead && !e.cloaked && e.dist <= BR + e.r) targets.push(e); });
       shuffleInPlace(targets);
       const n = 1 + S.ext.bolt.extra;
       for (let k = 0; k < Math.min(n, targets.length); k++){
-        const t = targets[k];
-        G.bolts.push({ path: lightningPath(CX, CY, t.x, t.y), life:.3, life0:.3 });
-        hitEnemy(t, extPower('bolt'), false);
+        const t0 = targets[k];
+        const hit = [t0];
+        G.bolts.push({ path: lightningPath(CX, CY, t0.x, t0.y), life:.3, life0:.3 });
+        hitEnemy(t0, extPower('bolt'), false);
+        let from = t0;
+        for (let j = 0; j < S.ext.bolt.jump; j++){
+          const nxt = nearTarget(from.x, from.y, BOLT_JUMP_RADIUS, hit);
+          if (!nxt) break;
+          G.bolts.push({ path: lightningPath(from.x, from.y, nxt.x, nxt.y), life:.3, life0:.3 });
+          hitEnemy(nxt, extPower('bolt'), false);
+          hit.push(nxt);
+          from = nxt;
+        }
       }
       S.st.abilities++;
     }
@@ -1435,12 +1488,16 @@ function gainRankPoints(n){
   if (S.rank >= RANK_MAX){ S.rank = RANK_MAX; S.rankPts = 0; }
 }
 function kill(e){
+  // Goldregen: vervielfacht die gesamte Welle, aber die Beute wandert komplett
+  // ins Depot und wird erst bei "Welle gewonnen" ausgezahlt (siehe waveCleared/
+  // damageBase) - genau wie bei den harten Schwierigkeiten, nur zu 100 %.
+  const rain = G.goldRain;
   const r = C.reward * Math.pow(C.rewardGrowth, S.wave - 1) * e.reward * D().reward
-          * val('income') * goldMult() * (1);
+          * val('income') * goldMult() * (rain ? rain.mult : 1);
   // Auf harten Stufen wandert ein Anteil der Beute ins Depot und wird
   // erst nach geräumter Welle ausgezahlt. Der Rest kommt sofort, damit
   // man überhaupt anfangen kann.
-  const hold = D().escrow || 0;
+  const hold = rain ? 1 : (D().escrow || 0);
   const now = r * (1 - hold);
   G.pendGold += r * hold;
   S.gold += now; S.st.gold += now;
@@ -1703,7 +1760,9 @@ function resetRun(startWaveNum){
   S.bestWave = S.wave;
   S.cleared = S.wave - 1;
   for (const k in S.lv) S.lv[k] = 0;
-  for (const id in S.ext) S.ext[id] = { lv:0, pw:0, cd:0, extra:0 };
+  for (const id in S.ext) S.ext[id] = { lv:0, pw:0, cd:0, extra:0, reach:0, jump:0 };
+  S.ringLv = 0;
+  G.goldRain = null;
   G.shocks.length = 0; G.bolts.length = 0; G.spiralShots.length = 0; G.beams.length = 0; G.droneShots.length = 0;
   G.enemies.length = 0; G.bullets.length = 0; G.toSpawn = 0;
   G.bossPending = false; G.queued = 0;
@@ -2062,6 +2121,17 @@ function drawRange(){
   ctx.beginPath(); ctx.arc(CX, CY, R, 0, TAU); ctx.stroke();
   ctx.setLineDash([]);
 
+  // Erweiterungsring: äußere Grenze, bis zu der Schockwellen laufen und in
+  // der sich Begleitschiffe bewegen. Nur sichtbar, wenn eine dieser
+  // Erweiterungen überhaupt existiert.
+  if (extOwned('shock') || extOwned('drone')){
+    ctx.strokeStyle = 'rgba(126,240,255,.4)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 7]); ctx.lineDashOffset = G.t * 10;
+    ctx.beginPath(); ctx.arc(CX, CY, extRingPx(), 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
   for (const w of G.waves){
     ctx.strokeStyle = w.strong ? `rgba(78,230,196,${w.life / .55})` : `rgba(139,124,255,${w.life / .8 * .6})`;
     ctx.lineWidth = w.strong ? 4 : 2;
@@ -2155,6 +2225,12 @@ function drawDrones(){
   for (const d of G.drones){
     ctx.save();
     ctx.translate(d.x, d.y);
+    // Eigener Angriffsradius des Schiffs, unabhängig vom Kern
+    ctx.strokeStyle = 'rgba(75,184,255,.22)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 6]);
+    ctx.beginPath(); ctx.arc(0, 0, DRONE_ATTACK_RADIUS, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
     ctx.rotate(d.a + Math.PI / 2);
     ctx.shadowColor = '#7ef0ff'; ctx.shadowBlur = 12;
     ctx.fillStyle = '#d6f4ff';
@@ -2844,25 +2920,56 @@ function renderExtBar(){
     el.p.textContent = e.pwBase !== undefined ? fmt(extPower(id)) + ' dmg' : 'Sofort-Kill';
     el.s.textContent = ready ? (e.manual ? 'klicken' : 'bereit') : dec(remain) + 's';
     el.cd.style.height = (total > 0 ? remain / total * 100 : 0) + '%';
-    el.k.textContent = 'L' + (1 + s.pw + s.cd + s.extra);
+    el.k.textContent = 'L' + (1 + s.pw + s.cd + s.extra + s.reach + s.jump);
   }
 }
 
-// Beschreibt, was genau sich durch diese Karte ändert ("jetzt -> danach")
-function extTrackText(id, kind){
+// Jede normale Verbesserungskarte kommt in einer von drei Stufen: normal
+// (wie gehabt, 1 Schritt), super (2 Schritte, blau) oder ultra (4 Schritte,
+// golden, sehr selten). Gilt nicht für Sonderkarten wie Ringgesundheit,
+// Goldregen oder Erstfreischaltungen.
+const CARD_TIERS = [
+  { id:'normal', step:1, w:65 },
+  { id:'super',  step:2, w:28, cls:'tier-super', label:'Super' },
+  { id:'ultra',  step:4, w:7,  cls:'tier-ultra', label:'Ultra' },
+];
+function rollCardTier(){
+  const total = CARD_TIERS.reduce((s, t) => s + t.w, 0);
+  let r = Math.random() * total;
+  for (const t of CARD_TIERS){ if ((r -= t.w) < 0) return t; }
+  return CARD_TIERS[0];
+}
+// Goldregen-Vervielfacher: x1,5 kommt häufig vor, nach oben hin immer seltener.
+const GOLDRAIN_TIERS = [
+  { mult:1.5, w:40 }, { mult:2, w:24 }, { mult:3, w:16 },
+  { mult:5, w:10 }, { mult:10, w:6 }, { mult:15, w:4 },
+];
+function rollGoldRainMult(){
+  const total = GOLDRAIN_TIERS.reduce((s, t) => s + t.w, 0);
+  let r = Math.random() * total;
+  for (const t of GOLDRAIN_TIERS){ if ((r -= t.w) < 0) return t.mult; }
+  return GOLDRAIN_TIERS[0].mult;
+}
+
+// Beschreibt, was genau sich durch diese Karte ändert ("jetzt -> danach").
+// step: wie viele Stufen diese Karte auf einmal gibt (normal/super/ultra).
+function extTrackText(id, kind, step){
+  step = step || 1;
   const e = EXT[id], s = S.ext[id];
   if (kind === 'unlock') return e.unlockDesc;
-  if (kind === 'pw') return `Stärke: ${fmt(extPowerAt(id, s.pw))} → ${fmt(extPowerAt(id, s.pw + 1))}`;
+  if (kind === 'pw') return `Stärke: ${fmt(extPowerAt(id, s.pw))} → ${fmt(extPowerAt(id, s.pw + step))}`;
   if (kind === 'cd'){
-    if (e.rateBased) return `Schussrate: ${dec2(e.rateBase + e.rateStep * s.cd)}/s → ${dec2(e.rateBase + e.rateStep * (s.cd + 1))}/s`;
-    return `Aufladedauer: ${dec(extCdAt(id, s.cd))}s → ${dec(extCdAt(id, s.cd + 1))}s`;
+    if (e.rateBased) return `Schussrate: ${dec2(e.rateBase + e.rateStep * s.cd)}/s → ${dec2(e.rateBase + e.rateStep * (s.cd + step))}/s`;
+    return `Aufladedauer: ${dec(extCdAt(id, s.cd))}s → ${dec(extCdAt(id, s.cd + step))}s`;
   }
   if (kind === 'extra'){
     const label = id === 'bolt' ? 'gleichzeitige Ziele'
       : id === 'drone' ? 'Begleitschiffe'
       : id === 'shock' ? 'Ringe hintereinander' : 'gleichzeitige Richtungen';
-    return `+1 ${label}: ${1 + s.extra} → ${2 + s.extra}`;
+    return `+${step} ${label}: ${1 + s.extra} → ${1 + step + s.extra}`;
   }
+  if (kind === 'reach') return `Reichweite: +${Math.round(e.reachStep * s.reach)}px → +${Math.round(e.reachStep * (s.reach + step))}px`;
+  if (kind === 'jump') return `Kettensprünge: ${s.jump} → ${s.jump + step}`;
   return '';
 }
 
@@ -2870,7 +2977,7 @@ function extTrackText(id, kind){
 // sonst eine je noch nicht ausgereiztem Ausbau der bereits besessenen.
 // Superschockwelle und weitere Schockwellen-Ringe sind extrem selten und
 // werden nur mit geringer Chance überhaupt in den Topf gelegt; die
-// Ringgesundheit-Karte ist immer mit dabei, auch bei vollem Schild.
+// Ringgesundheit- und Goldregen-Karten sind immer mit dabei.
 function extPool(){
   const pool = [];
   for (const id in EXT){
@@ -2881,15 +2988,19 @@ function extPool(){
       continue;
     }
     for (const track of e.tracks){
-      if (track === 'pw' && s.pw < e.pwMaxLv) pool.push({ ext:id, kind:'pw' });
-      else if (track === 'cd' && s.cd < e.cdMaxLv) pool.push({ ext:id, kind:'cd' });
+      if (track === 'pw' && s.pw < e.pwMaxLv) pool.push({ ext:id, kind:'pw', tier: rollCardTier() });
+      else if (track === 'cd' && s.cd < e.cdMaxLv) pool.push({ ext:id, kind:'cd', tier: rollCardTier() });
       else if (track === 'extra' && s.extra < (e.extraMax || 0)){
-        if (id === 'shock'){ if (Math.random() < 0.1) pool.push({ ext:id, kind:'extra' }); }
-        else pool.push({ ext:id, kind:'extra' });
+        if (id === 'shock'){ if (Math.random() < 0.1) pool.push({ ext:id, kind:'extra', tier: rollCardTier() }); }
+        else pool.push({ ext:id, kind:'extra', tier: rollCardTier() });
       }
+      else if (track === 'reach' && s.reach < (e.reachMaxLv || 0)) pool.push({ ext:id, kind:'reach', tier: rollCardTier() });
+      else if (track === 'jump' && s.jump < (e.jumpMax || 0)) pool.push({ ext:id, kind:'jump', tier: rollCardTier() });
     }
   }
   pool.push({ kind:'heal' });
+  pool.push({ kind:'goldrain', mult: rollGoldRainMult() });
+  if ((extOwned('shock') || extOwned('drone')) && S.ringLv < RING_MAX_LV) pool.push({ kind:'ring', tier: rollCardTier() });
   return pool;
 }
 
@@ -2900,13 +3011,26 @@ function offerExtensionPick(){
   const box = $('extCards');
   box.innerHTML = '';
   for (const card of pool.slice(0, 3)){
-    const isHeal = card.kind === 'heal';
-    const e = isHeal ? null : EXT[card.ext];
-    const icon = isHeal ? ICONS.shield : ICONS[e.icon];
-    const title = isHeal ? 'Ringgesundheit auffüllen' : (card.kind === 'unlock' ? `${e.name} freischalten` : e.name);
-    const desc = isHeal ? 'Füllt deinen Schutzschild sofort komplett auf, auch wenn er bereits voll ist.' : extTrackText(card.ext, card.kind);
+    let icon, title, desc;
+    if (card.kind === 'heal'){
+      icon = ICONS.shield; title = 'Ringgesundheit auffüllen';
+      desc = 'Füllt deinen Schutzschild sofort komplett auf, auch wenn er bereits voll ist.';
+    } else if (card.kind === 'goldrain'){
+      icon = ICONS.income; title = `Goldregen ×${dec(card.mult)}`;
+      desc = `Die gesamte nächste Welle bringt ×${dec(card.mult)} Gold – ausgezahlt aber nur, wenn du die Welle auch gewinnst.`;
+    } else if (card.kind === 'ring'){
+      icon = ICONS.range; title = 'Erweiterungsring vergrößern';
+      desc = `Schockwellen reichen weiter, Begleitschiffe bekommen mehr Platz: +${card.tier.step * RING_STEP}px.`;
+    } else {
+      const e = EXT[card.ext];
+      icon = ICONS[e.icon];
+      title = card.kind === 'unlock' ? `${e.name} freischalten` : e.name;
+      desc = extTrackText(card.ext, card.kind, card.tier ? card.tier.step : 1);
+    }
     const b = document.createElement('button');
-    b.innerHTML = `<span class="ic">${svgIcon(icon)}</span><strong></strong><small></small>`;
+    if (card.tier && card.tier.cls) b.classList.add(card.tier.cls);
+    const tierTag = (card.tier && card.tier.label) ? `<em class="tier-tag">${card.tier.label}</em>` : '';
+    b.innerHTML = `<span class="ic">${svgIcon(icon)}</span>${tierTag}<strong></strong><small></small>`;
     b.querySelector('strong').textContent = title;
     b.querySelector('small').textContent = desc;
     b.addEventListener('click', () => pickExtCard(card));
@@ -2925,11 +3049,36 @@ function pickExtCard(card){
     save(); renderUI();
     return;
   }
+  if (card.kind === 'goldrain'){
+    G.goldRain = { mult: card.mult };
+    toast(`Goldregen: ×${dec(card.mult)} Gold in dieser Welle`);
+    logHistory(`Goldregen gewählt: ×${dec(card.mult)} Gold in der nächsten Welle`, 'ext');
+    sfx('power');
+    $('extPick').hidden = true;
+    save(); renderUI();
+    return;
+  }
+  if (card.kind === 'ring'){
+    S.ringLv = Math.min(RING_MAX_LV, S.ringLv + card.tier.step);
+    const gain = card.tier.step * RING_STEP;
+    toast(`Erweiterungsring vergrößert: +${gain}px`);
+    logHistory(`Erweiterungsring vergrößert: +${gain}px`, 'ext');
+    sfx('power');
+    $('extPick').hidden = true;
+    save(); renderUI();
+    return;
+  }
   const s = S.ext[card.ext], e = EXT[card.ext];
-  if (card.kind === 'unlock'){ s.lv = 1; toast(`${e.name} freigeschaltet`); }
-  else if (card.kind === 'pw'){ s.pw++; toast(`${e.name}: Stärke erhöht`); }
-  else if (card.kind === 'cd'){ s.cd++; toast(`${e.name}: ${e.rateBased ? 'Schussrate erhöht' : 'Aufladedauer verkürzt'}`); }
-  else if (card.kind === 'extra'){ s.extra++; toast(`${e.name}: +1 gleichzeitig`); }
+  const step = card.tier ? card.tier.step : 1;
+  let msg = '';
+  if (card.kind === 'unlock'){ s.lv = 1; msg = `${e.name} freigeschaltet`; }
+  else if (card.kind === 'pw'){ s.pw = Math.min(e.pwMaxLv, s.pw + step); msg = `${e.name}: Stärke erhöht`; }
+  else if (card.kind === 'cd'){ s.cd = Math.min(e.cdMaxLv, s.cd + step); msg = `${e.name}: ${e.rateBased ? 'Schussrate erhöht' : 'Aufladedauer verkürzt'}`; }
+  else if (card.kind === 'extra'){ s.extra = Math.min(e.extraMax || 0, s.extra + step); msg = `${e.name}: +${step} gleichzeitig`; }
+  else if (card.kind === 'reach'){ s.reach = Math.min(e.reachMaxLv || 0, s.reach + step); msg = `${e.name}: Reichweite erhöht`; }
+  else if (card.kind === 'jump'){ s.jump = Math.min(e.jumpMax || 0, s.jump + step); msg = `${e.name}: +${step} Kettensprünge`; }
+  toast(msg);
+  logHistory(msg, 'ext');
   sfx('power');
   $('extPick').hidden = true;
   save(); renderUI();
@@ -3030,7 +3179,7 @@ function save(){
   try {
     storage.setItem(SAVE_KEY, JSON.stringify({
       v: 2, gold: S.gold, wave: S.wave, bestWave: S.bestWave, stars: S.stars, diff: S.diff,
-      rank: S.rank, rankPts: S.rankPts,
+      rank: S.rank, rankPts: S.rankPts, ringLv: S.ringLv,
       lv: S.lv, sp: S.sp, tal: S.tal, ext: S.ext, crystals: S.crystals, aim: S.aim, cleared: S.cleared,
       chDone: S.chDone, ch: S.ch, chTime: S.chTime, done: S.done, st: S.st,
       autoBuy: S.autoBuy, sound: S.sound, ips: G.ips, at: Date.now(),
@@ -3055,6 +3204,7 @@ function load(){
   S.stars = Math.floor(num(d.stars, 0));
   S.rank = clamp(Math.floor(num(d.rank, 1)), 1, RANK_MAX);
   S.rankPts = clamp(Math.floor(num(d.rankPts, 0)), 0, RANK_PTS_PER - 1);
+  S.ringLv = clamp(Math.floor(num(d.ringLv, 0)), 0, RING_MAX_LV);
   if (DIFFS.some(x => x.id === d.diff)) S.diff = d.diff;
   for (const u of UPGRADES){
     const l = Math.floor(num(d.lv && d.lv[u.id], 0));
@@ -3074,6 +3224,8 @@ function load(){
       pw: clamp(Math.floor(num(x.pw, 0)), 0, e.pwMaxLv || 0),
       cd: clamp(Math.floor(num(x.cd, 0)), 0, e.cdMaxLv),
       extra: clamp(Math.floor(num(x.extra, 0)), 0, e.extraMax || 0),
+      reach: clamp(Math.floor(num(x.reach, 0)), 0, e.reachMaxLv || 0),
+      jump: clamp(Math.floor(num(x.jump, 0)), 0, e.jumpMax || 0),
     };
   }
   if (AIMS.some(a => a.id === d.aim)) S.aim = d.aim;
@@ -3194,11 +3346,11 @@ function toast(msg, ms = 2200){
 // Unterschied zum Toast nicht flüchtig. Nur für die laufende Sitzung,
 // wird nicht mitgespeichert.
 const historyList = $('historyList');
-function logHistory(text, kind){
-  G.history.push({ text, kind });
+function logHistory(text, kind, indent){
+  G.history.push({ text, kind, indent });
   if (G.history.length > 150) G.history.shift();
   const line = document.createElement('div');
-  line.className = 'hl' + (kind ? ' hl-' + kind : '');
+  line.className = 'hl' + (kind ? ' hl-' + kind : '') + (indent ? ' hl-sub' : '');
   line.textContent = text;
   historyList.appendChild(line);
   while (historyList.children.length > 150) historyList.removeChild(historyList.firstChild);
@@ -3215,6 +3367,13 @@ function renderUI(){
   $('rank').textContent = S.rank;
   $('rankName').textContent = rankName(S.rank);
   $('rankBadge').style.setProperty('--rc', rankColor(S.rank));
+  if (S.rank >= RANK_MAX){
+    $('rankFill').style.width = '100%';
+    $('rankPtsLabel').textContent = 'Max erreicht';
+  } else {
+    $('rankFill').style.width = (S.rankPts / RANK_PTS_PER * 100) + '%';
+    $('rankPtsLabel').textContent = `${S.rankPts} / ${RANK_PTS_PER} bis Rang ${S.rank + 1}`;
+  }
   $('ips').textContent = fmt(G.ips);
   $('acc').textContent = G.shots > 20 ? Math.round(G.hits / G.shots * 100) + ' %' : '–';
 
@@ -3224,7 +3383,11 @@ function renderUI(){
   $('dmgSalve').textContent = `${fmt(shot * multiCount())}${critChance() > 0 ? ' · ⌀ ' + fmt(shot * multiCount() * critAvg) : ''}`;
   $('dmgClick').textContent = fmt(clickDamage());
   $('wave').textContent = `Welle ${S.wave}`;
+  $('waveBest').textContent = `Max ${S.st.bestEver}`;
   $('pausedTag').hidden = !G.userPause;
+  const grTag = $('goldRainTag');
+  grTag.hidden = !G.goldRain;
+  if (G.goldRain) grTag.textContent = `Goldregen ×${dec(G.goldRain.mult)}`;
   renderExtBar();
   renderUpgrades();   // immer sichtbare Kauf-Leiste: Preise/Werte laufend aktuell halten
   $('boss').hidden = S.wave % C.bossEvery !== 0;
@@ -3252,7 +3415,10 @@ function renderUI(){
     : 'tippen für nächste Welle';
   const maxHp = shieldMax();
   $('hpFill').style.width = clamp(G.hp / maxHp * 100, 0, 100) + '%';
-  $('hpLabel').textContent = `Schild ${Math.ceil(Math.max(0, G.hp))} / ${maxHp}`;
+  // Bei vollem Schild reicht die ganze Zahl; ist er beschädigt, zeigen zwei
+  // Nachkommastellen die laufende Regeneration sichtbar an, statt durch
+  // Aufrunden auf die nächste ganze Zahl zu "springen".
+  $('hpLabel').textContent = `Schild ${G.hp < maxHp ? dec2(Math.max(0, G.hp)) : maxHp} / ${maxHp}`;
 
   $('stKills').textContent = fmt(S.st.kills);
   $('stBoss').textContent = fmt(S.st.bosses);
