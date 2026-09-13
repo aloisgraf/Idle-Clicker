@@ -72,9 +72,10 @@ canvas{display:block;width:100%;height:100%;cursor:crosshair;touch-action:manipu
 .rush-hint{color:var(--muted);opacity:.7;font-size:.66rem;margin-top:4px}
 #queued{background:rgba(78,230,196,.16);color:var(--acc);border-color:rgba(78,230,196,.45)}
 #chalTag{background:rgba(255,200,87,.16);color:var(--core);border-color:rgba(255,200,87,.45);text-transform:none;letter-spacing:0}
-.panel-toggle{display:flex;align-items:center;gap:6px;padding:6px 9px;font-size:.8rem;font-weight:600;transition:border-color .15s}
+.panel-toggle{display:flex;align-items:center;gap:6px;padding:6px 9px;font-size:.8rem;font-weight:600;transition:border-color .15s,box-shadow .15s}
 .panel-toggle:hover{border-color:var(--line-2)}
 .panel-toggle svg{width:15px;height:15px;color:var(--core)}
+.panel-toggle[aria-pressed="true"]{border-color:rgba(255,200,87,.6);background:rgba(255,200,87,.12);box-shadow:0 0 14px rgba(255,200,87,.25)}
 .kbd{font-size:.62rem;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:0 5px;font-weight:400}
 
 .bottom-stack{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:9px;pointer-events:auto;z-index:5;max-width:96vw}
@@ -396,6 +397,10 @@ aside{position:fixed;left:0;right:0;bottom:0;z-index:7;width:100%;max-width:980p
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3H3v4M13 3h4v4M13 17h4v-4M7 17H3v-4"/></svg>
             <span class="kbd">F</span>
           </button>
+          <button class="glass panel-toggle" id="speedBtn" title="Doppelte Geschwindigkeit (Taste G) - ab Rang 10" aria-pressed="false" hidden>
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l6 6-6 6M10 4l6 6-6 6"/></svg>
+            <span class="kbd">G</span>
+          </button>
         </div>
       </div>
 
@@ -542,7 +547,7 @@ const C = {
   crystalBoss: 3,        // Kristalle pro besiegtem Boss
 };
 const SAVE_KEY = 'ringwache.v2';
-const VERSION = 4;   // von Hand bei jeder Änderung um 1 erhöhen
+const VERSION = 5;   // von Hand bei jeder Änderung um 1 erhöhen
 
 /* Schwierigkeitsstufen: Multiplikatoren auf das Grundspiel.
    fallback = Wellen zurück beim Schildbruch. */
@@ -581,7 +586,7 @@ const TYPES = {
     name:'Gepanzert', desc:'Schluckt einen Teil jedes Treffers. Volltreffer lohnen sich hier besonders.' },
   // Heiler: heilt alle Gegner in der Nähe, zuerst ausschalten
   healer:   { r:15, hp:1.6, speed:.65,  reward:2.6, dmg:1, color:'#6ee7a8', shape:'cross', heal:.10, healR:150,
-    name:'Heiler', desc:'Bleibt am äußeren Ring stehen, in Schussweite, und heilt von dort aus alle Gegner in seiner Nähe. Zuerst ausschalten.' },
+    name:'Heiler', desc:'Bleibt am äußeren Ring stehen, in Schussweite, und heilt sowie stärkt von dort aus alle Gegner in seiner Nähe. Zuerst ausschalten.' },
   // Regenerator: heilt sich selbst, wenn er zwei Sekunden nicht getroffen wurde
   regen:    { r:16, hp:1.5, speed:.85,  reward:2,   dmg:1, color:'#ffd166', shape:'hex',   regen:.12,
     name:'Regenerierer', desc:'Heilt sich selbst, sobald er zwei Sekunden nicht getroffen wurde.' },
@@ -756,41 +761,43 @@ const ACHS = [
 const CD_STEP = 0.2;
 const EXT = {
   shock: { id:'shock', name:'Schockwelle', short:'Schock', icon:'shock',
-    unlockDesc:'Ein Ring bricht regelmäßig vom Kern bis zum Rand deiner Reichweite und beschädigt jeden Angreifer, den er streift.',
+    unlockDesc:'Ein Ring bricht regelmäßig vom Kern bis zum Erweiterungsring und beschädigt jeden Angreifer, den er streift.',
     cdBase:25, cdMin:6,
     pwBase:14, pwStep:.45, pwMaxLv:10, extraMax:3,
     tracks:['cd','pw','extra'] },
-  // Synapsenblitz reicht 150px über die normale Reichweite hinaus (per
-  // "reach"-Ausbau weiter steigerbar) und kann per "jump"-Ausbau von
-  // seinem Ziel aus zu weiteren Zielen überspringen (siehe boltRange/
-  // BOLT_JUMP_RADIUS in updateExtensions).
+  // Synapsenblitz reicht bis zum Erweiterungsring (per "reach"-Ausbau noch
+  // weiter steigerbar) und kann per "jump"-Ausbau von seinem Ziel aus zu
+  // weiteren Zielen überspringen (siehe boltRange/BOLT_JUMP_RADIUS in
+  // updateExtensions).
   bolt: { id:'bolt', name:'Synapsenblitz', short:'Blitz', icon:'bolt',
-    unlockDesc:'Ein Blitz springt in regelmäßigen Abständen zu einem Gegner bis 150px über deine Reichweite hinaus.',
+    unlockDesc:'Ein Blitz springt in regelmäßigen Abständen zu einem Gegner bis zum Erweiterungsring.',
     cdBase:25, cdMin:6,
     pwBase:26, pwStep:.5, pwMaxLv:10, extraMax:3,
     reachStep:20, reachMaxLv:8, jumpMax:3,
     tracks:['pw','cd','extra','reach','jump'] },
+  // Synapsenrotation: je Ausbaustufe ein weiterer Feuerarm, gleichmäßig um
+  // den Kern verteilt (2 Arme = 180° gegenüber, bis zu insgesamt 4 Arme).
   spiral: { id:'spiral', name:'Synapsenrotation', short:'Rotation', icon:'spiral',
     unlockDesc:'Feuert ununterbrochen rotierende Geschosse ab, die sich spiralförmig nach außen ausbreiten.',
     cdBase:2, cdMin:.2,
-    pwBase:5, pwStep:.4, pwMaxLv:10,
-    tracks:['cd','pw'] },
+    pwBase:5, pwStep:.4, pwMaxLv:10, extraMax:3,
+    tracks:['cd','pw','extra'] },
   dirshot: { id:'dirshot', name:'Synapsenschuss', short:'Schuss', icon:'rush',
-    unlockDesc:'Schießt alle paar Sekunden in eine zufällige Himmelsrichtung und durchdringt alles auf dieser Linie.',
+    unlockDesc:'Schießt alle paar Sekunden in eine zufällige Himmelsrichtung und durchdringt alles auf dieser Linie bis zum Erweiterungsring.',
     cdBase:10, cdMin:3,
     pwBase:20, pwStep:.45, pwMaxLv:10, extraMax:3,
     tracks:['extra','pw','cd'] },
   // Begleitschiff: statt fester Aufladedauer eine Schussrate in Schuss/Sekunde,
   // die bei 0,2/s beginnt und je Stufe um 0,02/s steigt (siehe extCdAt).
   drone: { id:'drone', name:'Begleitschiff', short:'Schiff', icon:'drone',
-    unlockDesc:'Ein Begleitschiff bewegt sich frei außerhalb deiner Reichweite und feuert eigenständig auf Ziele in seiner Nähe.',
+    unlockDesc:'Ein Begleitschiff bewegt sich frei zwischen deiner Reichweite und dem Erweiterungsring und feuert eigenständig auf Ziele in seiner Nähe.',
     rateBased:true, rateBase:.2, rateStep:.02, rateMax:.6,
     pwBase:8, pwStep:.4, pwMaxLv:10, extraMax:3,
     tracks:['pw','cd','extra'] },
   // Superschockwelle: sehr selten, manuell per Klick auf die Leiste ausgelöst,
-  // vernichtet augenblicklich alles bis weit über die Reichweite hinaus.
+  // vernichtet augenblicklich alles bis zum Erweiterungsring.
   nuke: { id:'nuke', name:'Superschockwelle', short:'Super', icon:'over', manual:true,
-    unlockDesc:'Extrem selten. Klicke auf die Leiste unten, um alle Gegner bis 100px über deine Reichweite hinaus sofort zu vernichten, unabhängig von ihrem Leben. Danach lange Abklingzeit.',
+    unlockDesc:'Extrem selten. Klicke auf die Leiste unten, um alle Gegner bis zum Erweiterungsring sofort zu vernichten, unabhängig von ihrem Leben. Danach lange Abklingzeit.',
     cdBase:90, cdMin:45,
     tracks:['cd'] },
 };
@@ -806,7 +813,7 @@ for (const id in EXT){
    ========================================================= */
 const S = {
   gold: 0, wave: 1, bestWave: 1, stars: 0, buyMode: 1, diff: 'normal',
-  autoBuy: false, sound: false, rank: 1, rankPts: 0,
+  autoBuy: false, sound: false, rank: 1, rankPts: 0, fastMode: false,
   crystals: 0, aim: 'near', cleared: 0,   // cleared = höchste vollständig geräumte Welle
   lv: Object.fromEntries(UPGRADES.map(u => [u.id, 0])),
   sp: Object.fromEntries(SPECIALS.map(x => [x.id, 0])),
@@ -821,7 +828,7 @@ const S = {
 };
 const G = {
   enemies:[], bullets:[], parts:[], texts:[], ripples:[], flashes:[], waves:[], grid:new Map(),
-  toSpawn:0, spawnT:0, spawnLeft:0, bossPending:false, pause:0, waveTotal:0, waveKilled:0,
+  toSpawn:0, spawnT:0, spawnLeft:0, spawnMults:[], bossPending:false, pause:0, waveTotal:0, waveKilled:0,
   cd:0, hp:10, shake:0, hitFlash:0, spin:0, t:0,
   acc:0, accT:0, ips:0, shots:0, hits:0, drones:[],
   autoT:0, tab:'spec', shopTab:'atk', panel:false, userPause:false, queued:0, pendGold:0, pendCry:0, syn:[], dend:[],
@@ -894,9 +901,9 @@ const extCdAt = (id, lv) => {
 };
 const extPower   = id => extPowerAt(id, S.ext[id].pw);
 const extCd      = id => extCdAt(id, S.ext[id].cd);
-// Reichweite des Synapsenblitzes: 150px über die normale Reichweite hinaus,
-// plus Bonus aus dem "reach"-Ausbau.
-const boltRange = () => rangePx() + 150 + EXT.bolt.reachStep * S.ext.bolt.reach;
+// Reichweite des Synapsenblitzes: bis zum Erweiterungsring, plus Bonus aus
+// dem "reach"-Ausbau.
+const boltRange = () => extRingPx() + EXT.bolt.reachStep * S.ext.bolt.reach;
 // Suchradius für Kettensprünge: vom zuletzt getroffenen Ziel aus, nicht vom Kern.
 const BOLT_JUMP_RADIUS = 200;
 function shuffleInPlace(arr){
@@ -971,6 +978,8 @@ const rangePx = () => val('range') * minDim() * (1 + S.sp.range * .2) * (1 + .05
 // bei +25px, je Stufe (per Erweiterungskarte) weitere +10px.
 const RING_BASE = 25, RING_STEP = 10, RING_MAX_LV = 15;
 const extRingPx = () => rangePx() + RING_BASE + RING_STEP * S.ringLv;
+// Erweiterungen, deren Reichweite/Bewegungsraum der Erweiterungsring festlegt
+const ringInUse = () => ['shock', 'bolt', 'dirshot', 'drone', 'nuke'].some(extOwned);
 
 function resize(){
   const r = canvas.getBoundingClientRect();
@@ -1017,6 +1026,8 @@ function startWave(){
   G.bossPending = boss;
   G.toSpawn = waveCount();
   G.waveTotal = G.toSpawn; G.waveKilled = 0; G.queued = 0;
+  // Regulär gestartete Welle: kein Vorzieh-Bonus auf ihr Gold.
+  G.spawnMults = new Array(G.toSpawn).fill(1);
   // Alle Gegner einer Welle müssen innerhalb dieses Fensters eintreffen.
   // Mehr Gegner bedeuten damit automatisch dichteren Anflug.
   G.spawnLeft = D().waveTime;
@@ -1044,14 +1055,14 @@ function pickKind(){
   for (const [kind, acc] of pool) if (r <= acc) return kind;
   return 'normal';
 }
-function spawnEnemy(kind, atX, atY, countIt){
+function spawnEnemy(kind, atX, atY, countIt, mult){
   if (kind === 'swarm'){                      // Schwarm: fünf Mücken auf einmal
     const a0 = Math.random() * TAU;
     for (let k = 0; k < 5; k++){
       const a = a0 + (k - 2) * 0.13;
       const ca = Math.cos(a), sa = Math.sin(a);
       const edge = Math.min(Math.abs(CX / (ca || 1e-6)), Math.abs(CY / (sa || 1e-6))) + 40 + k * 14;
-      spawnEnemy('gnat', CX + ca * edge, CY + sa * edge, k === 0);
+      spawnEnemy('gnat', CX + ca * edge, CY + sa * edge, k === 0, mult);
     }
     return;
   }
@@ -1077,10 +1088,11 @@ function spawnEnemy(kind, atX, atY, countIt){
     phase:Math.random() * TAU, flash:0, dead:false,
     counted: atX === undefined || countIt === true,
     armor: T.armor || 0, heal: T.heal || 0, healR: T.healR || 0, regenRate: T.regen || 0,
-    healT: 0, lastHit: -99, healed: 0,
+    healT: 0, lastHit: -99, healed: 0, buffMult: 0, buffT: 0,
     enrage: T.enrage || 0,
     cloak: !!T.cloak, cloaked:false, cloakT: T.cloak ? 1.8 : 0,
     spawnRate: T.spawnRate || 0, spawnT: T.spawnRate || 0,
+    rushMult: mult || 1,
   });
 }
 function payout(){
@@ -1131,6 +1143,7 @@ function damageBase(amount, e){
     S.wave = back;
     S.cleared = Math.max(0, back - 1);
     G.enemies.length = 0; G.bullets.length = 0; G.toSpawn = 0; G.bossPending = false;
+    G.spawnMults.length = 0;
     G.queued = 0; S.st.breaks++;
     G.hp = shieldMax(); G.pause = 1.4;
     const beute = lostGold || lostCry
@@ -1358,9 +1371,9 @@ function updateExtensions(dt){
     if (s.r > ER + 20) G.shocks.splice(i, 1);
   }
 
-  // Synapsenblitz: trifft 1+extra Gegner gleichzeitig bis 150px über die
-  // Reichweite hinaus (+ Ausbau); von jedem Treffer aus kann er zusätzlich
-  // per "jump"-Ausbau zu weiteren, nahen Zielen überspringen.
+  // Synapsenblitz: trifft 1+extra Gegner gleichzeitig bis zum Erweiterungsring
+  // (+ Ausbau); von jedem Treffer aus kann er zusätzlich per "jump"-Ausbau
+  // zu weiteren, nahen Zielen überspringen.
   if (extOwned('bolt')){
     G.ext.bolt.cd -= dt;
     if (G.ext.bolt.cd <= 0){
@@ -1390,14 +1403,20 @@ function updateExtensions(dt){
   }
   for (let i = G.bolts.length - 1; i >= 0; i--) if ((G.bolts[i].life -= dt) <= 0) G.bolts.splice(i, 1);
 
-  // Synapsenrotation: laufend kleine Geschosse in einem Spiralmuster
+  // Synapsenrotation: laufend kleine Geschosse in einem Spiralmuster;
+  // 1+extra Feuerarme, gleichmäßig um den Kern verteilt (2 Arme = 180°
+  // gegenüber, bis zu insgesamt 4 Arme im 90°-Abstand).
   if (extOwned('spiral')){
     G.ext.spiral.cd -= dt;
     if (G.ext.spiral.cd <= 0){
       G.ext.spiral.cd = extCd('spiral');
       G.ext.spiral.angle += 0.16;        // enger Dreh: dicht gewundene Spirale statt weiter Lücken
       const a = G.ext.spiral.angle, sp = 240;
-      G.spiralShots.push({ x:CX, y:CY, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:2.4 });
+      const arms = 1 + S.ext.spiral.extra;
+      for (let k = 0; k < arms; k++){
+        const aa = a + (TAU / arms) * k;
+        G.spiralShots.push({ x:CX, y:CY, vx:Math.cos(aa)*sp, vy:Math.sin(aa)*sp, life:2.4 });
+      }
       S.st.abilities++;
     }
   }
@@ -1413,14 +1432,15 @@ function updateExtensions(dt){
     if (gone) G.spiralShots.splice(i, 1);
   }
 
-  // Synapsenschuss: durchdringende(r) Schuss(e) entlang zufälliger Achsen
+  // Synapsenschuss: durchdringende(r) Schuss(e) entlang zufälliger Achsen,
+  // bis zum Erweiterungsring
   if (extOwned('dirshot')){
     G.ext.dirshot.cd -= dt;
     if (G.ext.dirshot.cd <= 0){
       G.ext.dirshot.cd = extCd('dirshot');
       const dirs = shuffleInPlace([0, Math.PI/2, Math.PI, -Math.PI/2]);
       const n = Math.min(1 + S.ext.dirshot.extra, 4);
-      const R = rangePx(), pw = extPower('dirshot');
+      const R = extRingPx(), pw = extPower('dirshot');
       for (let k = 0; k < n; k++){
         const a = dirs[k], ca = Math.cos(a), sa = Math.sin(a);
         G.beams.push({ a, life:.3, life0:.3 });
@@ -1439,11 +1459,11 @@ function updateExtensions(dt){
 }
 
 // Superschockwelle: manuell per Klick auf die Leiste ausgelöst, vernichtet
-// augenblicklich jeden Gegner bis 100px über die Reichweite hinaus, egal
-// welches Leben oder welche Tarnung er hat.
+// augenblicklich jeden Gegner bis zum Erweiterungsring, egal welches Leben
+// oder welche Tarnung er hat.
 function triggerNuke(){
   if (!extOwned('nuke') || G.ext.nuke.cd > 0 || isPaused()) return;
-  const limit = rangePx() + 100;
+  const limit = extRingPx();
   let n = 0;
   for (const e of G.enemies){
     if (e.dead || e.dist > limit) continue;
@@ -1479,7 +1499,10 @@ function hitEnemy(e, dmg, fromClick){
 }
 /* Rang: reine Bestenlisten-Kennzahl ohne Spielwirkung. 50 Ränge, 100
    Punkte je Abschuss-Rang, ein Schildbruch kostet 10 Ränge. */
-const RANK_MAX = 50, RANK_PTS_PER = 100, RANK_LOSS = 10;
+const RANK_MAX = 50, RANK_PTS_PER = 100, RANK_LOSS = 10, RANK_FAST_MODE = 10;
+// Ab Rang 10 lässt sich das gesamte Spielgeschehen auf doppelte
+// Geschwindigkeit stellen (siehe frame()).
+const gameSpeed = () => (S.rank >= RANK_FAST_MODE && S.fastMode) ? 2 : 1;
 // 10 Rangstufen zu je 5 Graden (I-V): macht genau 50 einzeln benannte Ränge.
 const RANK_TIERS = ['Rekrut', 'Soldat', 'Veteran', 'Elitesoldat', 'Champion', 'Gladiator', 'Meister', 'Großmeister', 'Legende', 'Unsterblich'];
 const RANK_TIER_COLORS = ['#9fb0c9', '#8bc9ff', '#7ef0c4', '#4ee6c4', '#c49bff', '#ff9ecf', '#ffc857', '#ff9457', '#ff5a6e', '#ffffff'];
@@ -1500,13 +1523,15 @@ function kill(e){
   // Goldregen: vervielfacht die gesamte Welle, aber die Beute wandert komplett
   // ins Depot und wird erst bei "Welle gewonnen" ausgezahlt (siehe waveCleared/
   // damageBase) - genau wie bei den harten Schwierigkeiten, nur zu 100 %.
+  // Vorziehen-Bonus: Gegner aus vorgezogenen Wellen bringen das Gold ihrer
+  // Welle x2, x3, x4, ... (siehe rushWave); genauso nur bei Sieg ausgezahlt.
   const rain = G.goldRain;
   const r = C.reward * Math.pow(C.rewardGrowth, S.wave - 1) * e.reward * D().reward
-          * val('income') * goldMult() * (rain ? rain.mult : 1);
+          * val('income') * goldMult() * (rain ? rain.mult : 1) * (e.rushMult || 1);
   // Auf harten Stufen wandert ein Anteil der Beute ins Depot und wird
   // erst nach geräumter Welle ausgezahlt. Der Rest kommt sofort, damit
   // man überhaupt anfangen kann.
-  const hold = rain ? 1 : (D().escrow || 0);
+  const hold = (rain || e.rushMult > 1) ? 1 : (D().escrow || 0);
   const now = r * (1 - hold);
   G.pendGold += r * hold;
   S.gold += now; S.st.gold += now;
@@ -1598,7 +1623,7 @@ function update(dt){
     G.spawnLeft = Math.max(0, G.spawnLeft - dt);
     G.spawnT -= dt;
     if (G.spawnT <= 0){
-      spawnEnemy(pickKind());
+      spawnEnemy(pickKind(), undefined, undefined, undefined, G.spawnMults.shift());
       G.toSpawn--;
       // Restzeit gleichmäßig auf die restlichen Gegner verteilen, mit etwas Streuung
       const step = G.toSpawn > 0 ? G.spawnLeft / G.toSpawn : 0;
@@ -1611,20 +1636,28 @@ function update(dt){
   for (const e of G.enemies){
     if (e.dead) continue;
     if (e.healed > 0) e.healed -= dt;
+    if (e.buffT > 0) e.buffT -= dt;
     // Regenerator heilt sich, solange er zwei Sekunden nicht getroffen wurde
     if (e.regenRate && G.t - e.lastHit > 2 && e.hp < e.maxHp){
       e.hp = Math.min(e.maxHp, e.hp + e.maxHp * e.regenRate * dt);
     }
-    // Heiler pflegt alle Gegner in seiner Nähe
+    // Heiler pflegt UND stärkt alle Gegner in seiner Nähe: die Stärke des
+    // Schadensbonus richtet sich nach der aktuellen Welle (Level) und der
+    // eigenen Heilkraft des Heilers.
     if (e.heal){
       e.healT -= dt;
       if (e.healT <= 0){
         e.healT = 0.8;
+        const buff = e.heal * (1 + S.wave * 0.05);
         for (const o of G.enemies){
-          if (o === e || o.dead || o.hp >= o.maxHp) continue;
+          if (o === e || o.dead) continue;
           if (Math.hypot(o.x - e.x, o.y - e.y) > e.healR) continue;
-          o.hp = Math.min(o.maxHp, o.hp + o.maxHp * e.heal);
-          o.healed = .5;
+          if (o.hp < o.maxHp){
+            o.hp = Math.min(o.maxHp, o.hp + o.maxHp * e.heal);
+            o.healed = .5;
+          }
+          o.buffMult = buff;
+          o.buffT = 1;
         }
       }
     }
@@ -1649,7 +1682,7 @@ function update(dt){
     if (e.flash > 0) e.flash -= dt;
     if (e.dist <= C.coreRadius + e.r * .5){
       e.dead = true;
-      damageBase(e.dmg * D().dmgTaken, e);
+      damageBase(e.dmg * D().dmgTaken * (e.buffT > 0 ? 1 + e.buffMult : 1), e);
     }
   }
   rebuildGrid();
@@ -1775,7 +1808,7 @@ function resetRun(startWaveNum){
   S.ringLv = 0;
   G.goldRain = null;
   G.shocks.length = 0; G.bolts.length = 0; G.spiralShots.length = 0; G.beams.length = 0; G.droneShots.length = 0;
-  G.enemies.length = 0; G.bullets.length = 0; G.toSpawn = 0;
+  G.enemies.length = 0; G.bullets.length = 0; G.toSpawn = 0; G.spawnMults.length = 0;
   G.bossPending = false; G.queued = 0;
   G.hp = shieldMax(); G.pause = 1.2;
 }
@@ -2077,6 +2110,10 @@ function drawEnemy(e){
     ctx.strokeStyle = `rgba(110,231,168,${e.healed / .5})`; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(e.x, e.y, r + 5, 0, TAU); ctx.stroke();
   }
+  if (e.buffT > 0){                              // vom Heiler gestärkt: mehr Schaden
+    ctx.strokeStyle = `rgba(255,120,60,${e.buffT})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(e.x, e.y, r + 8, 0, TAU); ctx.stroke();
+  }
 
   // Balken plus Zahl, damit die Stärke des Gegners ablesbar ist
   const barW = Math.max(26, r * 1.7), barH = e.kind === 'boss' ? 5 : 3, barY = e.y - r - 11;
@@ -2132,10 +2169,11 @@ function drawRange(){
   ctx.beginPath(); ctx.arc(CX, CY, R, 0, TAU); ctx.stroke();
   ctx.setLineDash([]);
 
-  // Erweiterungsring: äußere Grenze, bis zu der Schockwellen laufen und in
-  // der sich Begleitschiffe bewegen. Nur sichtbar, wenn eine dieser
-  // Erweiterungen überhaupt existiert.
-  if (extOwned('shock') || extOwned('drone')){
+  // Erweiterungsring: äußere Grenze, bis zu der Schockwelle, Synapsenblitz,
+  // Synapsenschuss und Superschockwelle reichen und in der sich
+  // Begleitschiffe bewegen. Nur sichtbar, wenn eine dieser Erweiterungen
+  // überhaupt existiert.
+  if (ringInUse()){
     ctx.strokeStyle = 'rgba(126,240,255,.4)';
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 7]); ctx.lineDashOffset = G.t * 10;
@@ -2297,7 +2335,7 @@ function drawExtensions(){
   }
   if (G.beams.length){
     ctx.strokeStyle = '#5ce1a0'; ctx.lineWidth = 40;
-    const R = rangePx();
+    const R = extRingPx();
     for (const bm of G.beams){
       ctx.globalAlpha = Math.max(0, bm.life / bm.life0) * .5;
       ctx.beginPath(); ctx.moveTo(CX, CY);
@@ -2853,6 +2891,17 @@ function togglePause(){
 }
 $('pauseBtn').addEventListener('click', togglePause);
 
+// Ab Rang 10 freigeschaltet: doppelte Geschwindigkeit für das gesamte
+// Spielgeschehen (siehe gameSpeed()/frame()).
+function toggleFastMode(){
+  if (S.rank < RANK_FAST_MODE) return;
+  S.fastMode = !S.fastMode;
+  $('speedBtn').setAttribute('aria-pressed', String(S.fastMode));
+  toast(S.fastMode ? 'Doppelte Geschwindigkeit' : 'Normale Geschwindigkeit');
+  save();
+}
+$('speedBtn').addEventListener('click', toggleFastMode);
+
 /* =========================================================
    12c. Nächste Welle vorziehen
    ========================================================= */
@@ -2870,6 +2919,11 @@ function rushWave(){
   G.toSpawn += extra;
   G.waveTotal += extra;
   G.queued++; S.st.rushed++;
+  // Belohnung fürs Vorziehen: das Gold jeder weiteren vorgezogenen Welle
+  // wird mit ihrem Abstand zur ursprünglichen Welle vervielfacht (2., 3.,
+  // 4. vorgezogene Welle usw. bringt x2, x3, x4, ...), aber nur bei Sieg.
+  const rushMult = G.queued + 1;
+  for (let i = 0; i < extra; i++) G.spawnMults.push(rushMult);
   // Vorgezogene Wellen trudeln nicht ein, sie kommen als Schwung:
   // höchstens acht Sekunden für alles, was noch aussteht.
   G.spawnLeft = Math.min(G.spawnLeft, 8);
@@ -2890,6 +2944,7 @@ addEventListener('keydown', ev => {
   if (k === 'u'){ setPanel(!G.panel); return; }
   if (k === 'f'){ toggleFullscreen(); return; }
   if (k === 'p'){ togglePause(); return; }
+  if (k === 'g'){ toggleFastMode(); return; }
   if (ev.key === 'Escape' && G.panel){ setPanel(false); return; }
   if (k === 'w'){ audio(); rushWave(); }
 });
@@ -2976,7 +3031,8 @@ function extTrackText(id, kind, step){
   if (kind === 'extra'){
     const label = id === 'bolt' ? 'gleichzeitige Ziele'
       : id === 'drone' ? 'Begleitschiffe'
-      : id === 'shock' ? 'Ringe hintereinander' : 'gleichzeitige Richtungen';
+      : id === 'shock' ? 'Ringe hintereinander'
+      : id === 'spiral' ? 'Feuerarme' : 'gleichzeitige Richtungen';
     return `+${step} ${label}: ${1 + s.extra} → ${1 + step + s.extra}`;
   }
   if (kind === 'reach') return `Reichweite: +${Math.round(e.reachStep * s.reach)}px → +${Math.round(e.reachStep * (s.reach + step))}px`;
@@ -3011,7 +3067,7 @@ function extPool(){
   }
   pool.push({ kind:'heal' });
   pool.push({ kind:'goldrain', mult: rollGoldRainMult() });
-  if ((extOwned('shock') || extOwned('drone')) && S.ringLv < RING_MAX_LV) pool.push({ kind:'ring', tier: rollCardTier() });
+  if (ringInUse() && S.ringLv < RING_MAX_LV) pool.push({ kind:'ring', tier: rollCardTier() });
   return pool;
 }
 
@@ -3031,7 +3087,7 @@ function offerExtensionPick(){
       desc = `Die gesamte nächste Welle bringt ×${dec(card.mult)} Gold – ausgezahlt aber nur, wenn du die Welle auch gewinnst.`;
     } else if (card.kind === 'ring'){
       icon = ICONS.range; title = 'Erweiterungsring vergrößern';
-      desc = `Schockwellen reichen weiter, Begleitschiffe bekommen mehr Platz: +${card.tier.step * RING_STEP}px.`;
+      desc = `Alle Erweiterungen reichen weiter hinaus, Begleitschiffe bekommen mehr Platz: +${card.tier.step * RING_STEP}px.`;
     } else {
       const e = EXT[card.ext];
       icon = ICONS[e.icon];
@@ -3108,6 +3164,7 @@ function setDiff(id, restart){
     S.wave = 1; S.cleared = 0;
     G.pendGold = 0; G.pendCry = 0;
     G.enemies.length = 0; G.bullets.length = 0; G.toSpawn = 0; G.bossPending = false;
+    G.spawnMults.length = 0;
     G.hp = shieldMax(); G.pause = 1;
   }
   $('intro').hidden = true;
@@ -3193,7 +3250,7 @@ function save(){
       rank: S.rank, rankPts: S.rankPts, ringLv: S.ringLv,
       lv: S.lv, sp: S.sp, tal: S.tal, ext: S.ext, crystals: S.crystals, aim: S.aim, cleared: S.cleared,
       chDone: S.chDone, ch: S.ch, chTime: S.chTime, done: S.done, st: S.st,
-      autoBuy: S.autoBuy, sound: S.sound, ips: G.ips, at: Date.now(),
+      autoBuy: S.autoBuy, sound: S.sound, fastMode: S.fastMode, ips: G.ips, at: Date.now(),
       // Angebrochene Welle (auch vorgezogene) sichern, damit ein Neuladen
       // das Risiko des Vorziehens nicht kostenlos auflöst.
       waveTotal: G.waveTotal, waveKilled: G.waveKilled, queued: G.queued,
@@ -3258,6 +3315,7 @@ function load(){
   S.st.bestEver = Math.max(1, S.st.bestEver, S.bestWave);
   S.autoBuy = !!d.autoBuy;
   S.sound = !!d.sound;
+  S.fastMode = !!d.fastMode;
   G.ips = num(d.ips, 0);
 
   // Angebrochene Welle wiederherstellen: alles, was noch nicht besiegt war,
@@ -3385,6 +3443,9 @@ function renderUI(){
     $('rankFill').style.width = (S.rankPts / RANK_PTS_PER * 100) + '%';
     $('rankPtsLabel').textContent = `${S.rankPts} / ${RANK_PTS_PER} bis Rang ${S.rank + 1}`;
   }
+  if (S.rank < RANK_FAST_MODE) S.fastMode = false;   // Rang gefallen: Bonus wieder gesperrt
+  $('speedBtn').hidden = S.rank < RANK_FAST_MODE;
+  $('speedBtn').setAttribute('aria-pressed', String(S.fastMode));
   $('ips').textContent = fmt(G.ips);
   $('acc').textContent = G.shots > 20 ? Math.round(G.hits / G.shots * 100) + ' %' : '–';
 
@@ -3505,7 +3566,7 @@ function frame(now){
   last = now;
   // Ein Fehler in einem Frame darf die Schleife nicht dauerhaft anhalten.
   try {
-    if (W > 0 && H > 0){ update(dt); draw(); }
+    if (W > 0 && H > 0){ update(dt * gameSpeed()); draw(); }
     uiT += dt;
     if (uiT > 0.12){ uiT = 0; renderUI(); }
     saveT += dt;
