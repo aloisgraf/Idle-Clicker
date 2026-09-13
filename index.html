@@ -1,0 +1,2517 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ringwache – Idle Shooter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0a1f;
+  --panel:#141232;
+  --panel-2:#1b1840;
+  --core:#ffc857;
+  --ring:#8b7cff;
+  --acc:#4ee6c4;
+  --foe:#ff5a6e;
+  --gold:#ffd166;
+  --ink:#eeecff;
+  --muted:#9a95c8;
+  --line:rgba(139,124,255,.18);
+  --line-2:rgba(139,124,255,.34);
+  --shadow:0 8px 32px rgba(0,0,0,.38);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:"Chakra Petch",system-ui,sans-serif;background:var(--bg);color:var(--ink);
+  -webkit-font-smoothing:antialiased;overflow:hidden;
+}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+/* Wichtig: eigene display-Regeln überschreiben sonst das hidden-Attribut,
+   dann bleibt zum Beispiel der Startbildschirm für immer sichtbar. */
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--core);outline-offset:2px}
+::-webkit-scrollbar{width:8px}
+::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:4px}
+
+.game{display:block;position:relative;height:100vh;height:100dvh}
+.stage{position:absolute;inset:0;overflow:hidden}
+canvas{display:block;width:100%;height:100%;cursor:crosshair;touch-action:manipulation}
+
+/* ---------- HUD ---------- */
+.hud{position:absolute;inset:0;padding:11px 12px;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between}
+.hud-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.hud-bot{display:flex;justify-content:space-between;align-items:flex-end;gap:14px}
+.glass{background:rgba(20,18,50,.62);border:1px solid var(--line);border-radius:11px;padding:7px 11px;backdrop-filter:blur(8px);box-shadow:var(--shadow)}
+
+.gold-box{display:flex;align-items:center;gap:8px}
+.coin{width:17px;height:17px;border-radius:50%;flex:none;background:radial-gradient(circle at 34% 28%,#fff6d6,var(--gold) 44%,#c2831a);box-shadow:0 0 16px rgba(255,209,102,.5)}
+.gold-val{font-size:1.5rem;font-weight:700;line-height:1;color:var(--gold);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:.74rem;margin-top:3px;font-variant-numeric:tabular-nums;display:flex;gap:9px;flex-wrap:wrap;line-height:1.35}
+.sub b{color:var(--ink);font-weight:600}
+
+.top-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:auto}
+.wave-box{text-align:right;min-width:150px;display:block;transition:border-color .15s}
+.wave-box:hover{border-color:var(--line-2)}
+.wave-box:active{transform:translateY(1px)}
+.rush-hint{color:var(--muted);opacity:.7;font-size:.66rem;margin-top:4px}
+#queued{background:rgba(78,230,196,.16);color:var(--acc);border-color:rgba(78,230,196,.45)}
+#chalTag{background:rgba(255,200,87,.16);color:var(--core);border-color:rgba(255,200,87,.45);text-transform:none;letter-spacing:0}
+.panel-toggle{display:flex;align-items:center;gap:6px;padding:6px 9px;font-size:.8rem;font-weight:600;transition:border-color .15s}
+.panel-toggle:hover{border-color:var(--line-2)}
+.panel-toggle svg{width:15px;height:15px;color:var(--core)}
+.kbd{font-size:.62rem;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:0 5px;font-weight:400}
+
+.bottom-center{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:8px;align-items:center;pointer-events:auto;z-index:5}
+.panel-toggle.main{padding:8px 15px;font-size:.9rem;border-color:rgba(255,200,87,.45);box-shadow:0 0 26px rgba(255,200,87,.16),var(--shadow)}
+.panel-toggle.main:hover{border-color:var(--core)}
+.dim{position:absolute;inset:0;background:rgba(11,10,31,.45);pointer-events:none;z-index:3}
+.paused{font-size:.8rem;font-weight:600;color:var(--core);border:1px solid rgba(255,200,87,.45);border-radius:6px;padding:2px 7px;vertical-align:middle;margin-left:6px}
+.wave-top{display:flex;align-items:baseline;justify-content:flex-end;gap:8px}
+.wave-num{font-size:1.05rem;font-weight:700;line-height:1}
+.tag{font-size:.62rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 5px;border-radius:5px;background:rgba(255,90,110,.18);color:var(--foe);border:1px solid rgba(255,90,110,.4)}
+.bar{height:4px;border-radius:2px;background:rgba(255,255,255,.1);margin-top:5px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:3px}
+.bar.wavebar i{background:var(--acc)}
+.bar.shieldbar i{background:var(--ring)}
+.meta{display:flex;justify-content:flex-end;color:var(--muted);font-size:.7rem;margin-top:3px;font-variant-numeric:tabular-nums}
+
+.stats-box{font-size:.74rem;color:var(--muted);display:grid;gap:3px;font-variant-numeric:tabular-nums}
+.stats-box b{color:var(--ink);font-weight:600}
+
+/* ---------- Fähigkeiten ---------- */
+.abil{display:flex;gap:7px;pointer-events:auto}
+.ab{position:relative;width:62px;padding:6px 4px 5px;border-radius:11px;background:rgba(20,18,50,.72);border:1px solid var(--line);text-align:center;backdrop-filter:blur(8px);box-shadow:var(--shadow);transition:border-color .15s,transform .1s}
+.ab:hover{border-color:var(--line-2)}
+.ab:active{transform:translateY(1px)}
+.ab-ic{display:block;margin:0 auto 2px;width:17px;height:17px;color:var(--acc)}
+.ab-n{display:block;font-size:.63rem;font-weight:600;line-height:1.1}
+.ab-s{display:block;font-size:.6rem;color:var(--muted);margin-top:1px;font-variant-numeric:tabular-nums}
+.ab-k{position:absolute;top:2px;right:4px;font-size:.55rem;color:var(--muted)}
+.ab.ready{border-color:rgba(78,230,196,.55);box-shadow:0 0 18px rgba(78,230,196,.18)}
+.ab.live{border-color:var(--core);box-shadow:0 0 16px rgba(255,200,87,.3)}
+.ab.live .ab-ic{color:var(--core)}
+.ab.locked .ab-ic{color:var(--muted)}
+.ab-cd{position:absolute;inset:0;border-radius:13px;background:rgba(11,10,31,.6);pointer-events:none}
+
+.toast{position:absolute;left:50%;top:18%;transform:translate(-50%,-50%);font-size:1.1rem;font-weight:600;padding:10px 20px;border-radius:999px;background:rgba(11,10,31,.9);border:1px solid var(--line-2);opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;max-width:92%;box-shadow:var(--shadow)}
+.toast.show{opacity:1}
+.bosswarn{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);font-size:clamp(2rem,7vw,4rem);font-weight:700;letter-spacing:.2em;color:var(--foe);opacity:0;pointer-events:none;text-shadow:0 0 40px rgba(255,90,110,.7)}
+.bosswarn.show{animation:warn 2s ease-out}
+@keyframes warn{0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}25%{opacity:1;transform:translate(-50%,-50%) scale(1)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(1.12)}}
+
+/* ---------- Seitenleiste ---------- */
+aside{position:fixed;left:0;right:0;bottom:0;z-index:7;width:100%;max-width:980px;margin:0 auto;
+  max-height:74dvh;background:var(--panel);border:1px solid var(--line-2);border-bottom:0;
+  border-radius:20px 20px 0 0;display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior:contain;
+  box-shadow:0 -20px 60px rgba(0,0,0,.55);animation:sheet .22s ease-out}
+@keyframes sheet{from{transform:translateY(36px);opacity:0}}
+.grip{width:44px;height:4px;border-radius:2px;background:var(--line-2);margin:8px auto 0}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 16px 0}
+.brand h1{font-size:1.45rem;font-weight:700;color:var(--core);line-height:1.1;letter-spacing:-.01em}
+.icons{display:flex;gap:5px}
+.iconbtn{width:32px;height:32px;border-radius:9px;border:1px solid var(--line);display:grid;place-items:center;color:var(--muted);transition:color .15s,border-color .15s}
+.iconbtn:hover{color:var(--ink);border-color:var(--line-2)}
+.iconbtn[aria-pressed="true"]{color:var(--acc);border-color:rgba(78,230,196,.5)}
+.iconbtn svg{width:17px;height:17px}
+
+.ctrl{display:flex;align-items:center;gap:8px;padding:12px 16px 10px;flex-wrap:wrap}
+.seg{display:inline-flex;background:rgba(255,255,255,.05);border-radius:9px;padding:3px}
+.seg button{color:var(--muted);padding:5px 11px;border-radius:7px;font-size:.9rem}
+.seg button[aria-pressed="true"]{background:var(--ring);color:#131035;font-weight:600}
+.chip{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:.84rem;color:var(--muted)}
+.chip b{color:var(--ink);font-weight:600}
+.chip button{color:var(--muted);border-bottom:1px solid var(--line);font-size:.8rem;padding:1px 3px}
+.chip button:hover{color:var(--core);border-color:var(--core)}
+
+.tabs{display:flex;flex-wrap:wrap;gap:2px;padding:0 16px;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2;background:var(--panel)}
+.tabs button{flex:1 0 auto;min-width:72px;padding:9px 6px;font-size:.84rem;color:var(--muted);border-bottom:2px solid transparent;font-weight:500}
+.tabs button[aria-selected="true"]{color:var(--ink);border-color:var(--core)}
+.tabs button:hover{color:var(--ink)}
+
+.list{flex:1 0 auto;padding:10px 12px 14px;display:grid;gap:7px;align-content:start;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.up{display:grid;grid-template-columns:34px 1fr;gap:2px 11px;align-items:start;text-align:left;background:rgba(255,255,255,.032);border:1px solid var(--line);border-radius:13px;padding:10px 12px;transition:background .15s,border-color .15s;width:100%}
+.up:hover:not([aria-disabled="true"]){background:rgba(139,124,255,.11);border-color:var(--line-2)}
+.up[aria-disabled="true"]{cursor:default;opacity:.72}
+.up .ic{grid-row:span 3;width:34px;height:34px;border-radius:10px;display:grid;place-items:center}
+.up .ic svg{width:19px;height:19px}
+.up.cat-atk .ic{background:rgba(255,90,110,.14);color:var(--foe)}
+.up.cat-def .ic{background:rgba(139,124,255,.16);color:var(--ring)}
+.up.cat-eco .ic{background:rgba(255,209,102,.14);color:var(--gold)}
+.up-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.up-name{font-weight:600;font-size:1rem}
+.up-lvl{color:var(--muted);font-size:.8rem;font-variant-numeric:tabular-nums;flex:none}
+.up-val{color:var(--muted);font-size:.86rem;font-variant-numeric:tabular-nums}
+.up-cost{display:inline-flex;align-items:center;gap:6px;margin-top:3px;color:var(--gold);font-weight:600;font-size:.92rem;font-variant-numeric:tabular-nums}
+.up-cost::before{content:"";width:9px;height:9px;border-radius:50%;flex:none;background:radial-gradient(circle at 34% 28%,#fff6d6,var(--gold) 44%,#c2831a)}
+.up[aria-disabled="true"] .up-cost{color:var(--muted)}
+.up.maxed .up-cost{color:var(--acc)}
+.up.maxed .up-cost::before{display:none}
+.up.bought{animation:pop .26s ease-out}
+@keyframes pop{50%{transform:scale(.975);background:rgba(255,200,87,.16)}}
+
+.ach{display:grid;gap:7px;grid-column:1/-1;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.aimbox{pointer-events:auto;display:grid;gap:5px}
+.aimlabel{font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.aimrow{display:flex;gap:4px}
+.aimrow button{padding:4px 8px;border-radius:7px;border:1px solid var(--line);font-size:.74rem;color:var(--muted)}
+.aimrow button:hover{color:var(--ink);border-color:var(--line-2)}
+.aimrow button[aria-pressed="true"]{background:var(--ring);border-color:var(--ring);color:#131035;font-weight:600}
+
+.save-acts{display:flex;gap:8px}
+.tal-head,.ch-head{grid-column:1/-1;font-size:.82rem;font-weight:400;color:var(--muted);line-height:1.45;margin:2px 2px 4px}
+.up.cat-tal .ic{background:rgba(255,200,87,.14);color:var(--core)}
+.up.cat-tal:hover:not([aria-disabled="true"]){background:rgba(255,200,87,.1);border-color:rgba(255,200,87,.5)}
+.tal-cost{display:inline-flex;align-items:center;gap:5px;margin-top:3px;color:var(--core);font-weight:600;font-size:.92rem;font-variant-numeric:tabular-nums}
+.up.locked-tal{opacity:.55}
+.respec{grid-column:1/-1;justify-self:start;margin-top:4px;color:var(--muted);font-size:.8rem;border-bottom:1px solid var(--line);padding:1px 4px}
+.respec:hover{color:var(--core);border-color:var(--core)}
+
+.ch-i{display:grid;gap:3px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.032);border:1px solid var(--line)}
+.ch-i.active{border-color:rgba(255,200,87,.6);background:rgba(255,200,87,.07)}
+.ch-i.done{border-color:rgba(78,230,196,.45);background:rgba(78,230,196,.06)}
+.ch-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.ch-n{font-weight:600;font-size:1rem}
+.ch-r{color:var(--acc);font-size:.8rem;font-weight:600}
+.ch-d{color:var(--muted);font-size:.85rem;line-height:1.35}
+.ch-b{justify-self:start;margin-top:5px;padding:5px 12px;border-radius:9px;border:1px solid var(--line-2);font-size:.85rem;font-weight:600}
+.ch-b:hover{border-color:var(--core);color:var(--core)}
+.ch-state{font-size:.82rem;color:var(--core);font-weight:600;margin-top:4px}
+.cry{color:#7ef0ff}
+.cry b{color:#bdf1ff}
+.pend{color:var(--core)}
+.pend b{color:#ffe7ad}
+.sp-cost{display:inline-flex;align-items:center;gap:5px;margin-top:3px;color:#7ef0ff;font-weight:600;font-size:.92rem;font-variant-numeric:tabular-nums}
+.up.cat-spec .ic{background:rgba(126,240,255,.14);color:#7ef0ff}
+.up.cat-spec:hover:not([aria-disabled="true"]){background:rgba(126,240,255,.1);border-color:rgba(126,240,255,.5)}
+.stat{display:grid;gap:6px;grid-column:1/-1;grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+.spec-head{grid-column:1/-1;font-size:.82rem;font-weight:400;color:var(--muted);line-height:1.45;margin:2px 2px 4px}
+.stat h3{grid-column:1/-1;font-size:.78rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:6px 0 0}
+.stat-i{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:8px 11px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.stat-i span{color:var(--muted);font-size:.86rem}
+.stat-i b{font-weight:600;font-size:1rem;font-variant-numeric:tabular-nums}
+.stat-i.hi b{color:var(--core)}
+.ach-i{display:grid;grid-template-columns:26px 1fr;gap:2px 10px;align-items:center;padding:9px 11px;border-radius:11px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.ach-i.done{border-color:rgba(78,230,196,.45);background:rgba(78,230,196,.07)}
+.ach-d{grid-row:span 2;width:26px;height:26px;border-radius:50%;border:2px solid var(--line-2);display:grid;place-items:center;color:transparent}
+.ach-d svg{width:15px;height:15px}
+.ach-i.done .ach-d{border-color:var(--acc);color:var(--acc)}
+.ach-n{font-weight:600;font-size:.94rem}
+.ach-b{color:var(--muted);font-size:.82rem}
+.ach-i.done .ach-b{color:var(--acc)}
+
+.foot{border-top:1px solid var(--line);padding:9px 14px 10px;background:var(--panel-2);position:sticky;bottom:0;z-index:2}
+.foot-row{display:flex;align-items:center;gap:12px}
+.foot-txt{min-width:0}
+.foot h2{font-size:.88rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.foot p{color:var(--muted);font-size:.76rem;line-height:1.3;margin:2px 0 0}
+.pbtn{flex:none;width:auto;padding:8px 14px;font-size:.85rem;border-radius:10px;background:linear-gradient(180deg,rgba(255,200,87,.2),rgba(255,200,87,.09));border:1px solid rgba(255,200,87,.5);color:#ffe7ad;font-weight:600}
+.pbtn[aria-disabled="true"]{opacity:.45;cursor:default}
+.save-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:7px;color:var(--muted);font-size:.74rem}
+.save-row button{color:var(--muted);border-bottom:1px solid var(--line);padding:1px 4px;font-size:.79rem}
+.save-row button:hover{color:var(--foe);border-color:var(--foe)}
+
+/* ---------- Startbildschirm ---------- */
+.intro{position:absolute;inset:0;display:grid;place-items:center;padding:22px;background:rgba(11,10,31,.9);backdrop-filter:blur(4px);z-index:6;overflow:auto}
+.intro-box{max-width:600px;width:100%;text-align:center}
+.intro-box h2{font-size:1.8rem;font-weight:700;color:var(--core);line-height:1.15}
+.intro-box p{color:var(--muted);font-size:.94rem;margin:8px 0 18px;line-height:1.5}
+.diff-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:10px}
+.diff-cards button{display:grid;gap:5px;text-align:left;padding:13px;border-radius:13px;background:rgba(255,255,255,.05);border:1px solid var(--line);transition:background .15s,border-color .15s}
+.diff-cards button:hover{background:rgba(139,124,255,.15);border-color:var(--ring)}
+.diff-cards strong{font-size:1.08rem;font-weight:600}
+.diff-cards small{color:var(--muted);font-size:.8rem;line-height:1.35}
+.diff-cards em{font-style:normal;color:var(--gold);font-size:.79rem;font-weight:600}
+
+@media (max-width:820px){
+  .hud-bot{margin-bottom:44px}
+  .kbd{display:none}
+  aside{max-height:80dvh;border-radius:18px 18px 0 0}
+  .list{grid-template-columns:1fr}
+  .ach{grid-template-columns:1fr}
+  .gold-val{font-size:1.35rem}
+  .wave-box{min-width:128px}
+  .stats-box{display:none}
+  .ab{width:58px}
+  .hud{padding:12px}
+}
+@media (prefers-reduced-motion:reduce){
+  .up.bought,.bosswarn.show{animation:none}
+  .toast{transition:none}
+}
+</style>
+</head>
+<body>
+<main class="game">
+  <div class="stage" id="stage">
+    <canvas id="c" aria-label="Spielfeld. Klicke auf Eindringlinge für Extraschaden."></canvas>
+
+    <div class="hud">
+      <div class="hud-top">
+        <div class="glass">
+          <div class="gold-box">
+            <span class="coin" aria-hidden="true"></span>
+            <span class="gold-val" id="gold">0</span>
+          </div>
+          <div class="sub">
+            <span><b id="ips">0</b> Gold/s</span>
+            <span>Treffer <b id="acc">–</b></span>
+            <span class="cry">◈ <b id="crystals">0</b></span>
+            <span class="pend" id="pending" hidden></span>
+          </div>
+          <div class="sub">
+            <span>Schuss <b id="dmgShot">0</b></span>
+            <span>Salve <b id="dmgSalve">0</b></span>
+            <span>Klick <b id="dmgClick">0</b></span>
+          </div>
+        </div>
+        <div class="top-right">
+          <button class="glass wave-box" id="waveBtn" title="Klick: nächste Welle sofort dazu holen">
+          <div class="wave-top">
+            <span class="tag chal" id="chalTag" hidden></span>
+            <span class="tag" id="queued" hidden>+1</span>
+            <span class="tag" id="boss" hidden>Boss</span>
+            <span class="wave-num" id="wave">Welle 1</span>
+          </div>
+          <div class="bar wavebar" aria-hidden="true"><i id="waveFill" style="width:0"></i></div>
+          <div class="meta"><span id="waveLabel">0 / 0 besiegt</span></div>
+          <div class="bar shieldbar" aria-hidden="true"><i id="hpFill"></i></div>
+          <div class="meta"><span id="hpLabel">Schild 10 / 10</span></div>
+          <div class="meta rush-hint" id="rushHint">tippen für nächste Welle</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="hud-bot">
+        <div class="glass aimbox">
+          <span class="aimlabel">Ziel zuerst</span>
+          <div class="aimrow" id="aimRow"></div>
+        </div>
+        <div class="glass stats-box">
+          <span>Abschüsse <b id="stKills">0</b></span>
+          <span>Bosse <b id="stBoss">0</b></span>
+          <span>Spielzeit <b id="stTime">0 Min.</b></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-center">
+      <button class="glass panel-toggle main" id="panelBtn" aria-expanded="false">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 16V4M5 9l5-5 5 5"/></svg>
+        <span>Upgrades</span>
+        <span class="kbd">U</span>
+      </button>
+      <button class="glass panel-toggle" id="fsBtn" title="Vollbild (Taste F)">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3H3v4M13 3h4v4M13 17h4v-4M7 17H3v-4"/></svg>
+        <span class="kbd">F</span>
+      </button>
+    </div>
+    <div class="dim" id="dim" hidden></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="bosswarn" id="bossWarn" aria-hidden="true">BOSS</div>
+
+    <div class="intro" id="intro" hidden>
+      <div class="intro-box">
+        <h2>Wie hart soll es werden?</h2>
+        <p>Du hältst einen Kreis. Alles, was hineinkommt, wird automatisch beschossen.<br>Die Stufe kannst du später wechseln.</p>
+        <div class="diff-cards" id="diffCards"></div>
+      </div>
+    </div>
+  </div>
+
+  <aside hidden>
+    <div class="grip" aria-hidden="true"></div>
+    <div class="brand">
+      <h1>Ringwache <span class="paused">pausiert</span></h1>
+      <div class="icons">
+        <button class="iconbtn" id="closeBtn" title="Upgrades ausblenden und weiterspielen (U oder Esc)">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5l10 10M15 5L5 15"/></svg>
+        </button>
+        <button class="iconbtn" id="autoBtn" aria-pressed="false" title="Auto-Kauf: kauft laufend das günstigste Upgrade">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10a7 7 0 0 1 12-5l2 2"/><path d="M17 3v4h-4"/><path d="M17 10a7 7 0 0 1-12 5l-2-2"/><path d="M3 17v-4h4"/></svg>
+        </button>
+        <button class="iconbtn" id="soundBtn" aria-pressed="false" title="Ton an oder aus">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l4-3v10l-4-3H4z"/><path d="M14 7.5a3.5 3.5 0 0 1 0 5"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="ctrl">
+      <div class="seg" role="group" aria-label="Kaufmenge">
+        <button data-n="1" aria-pressed="true">×1</button>
+        <button data-n="10" aria-pressed="false">×10</button>
+        <button data-n="max" aria-pressed="false">Max</button>
+      </div>
+      <span class="chip"><b id="diffLabel">Normal</b><button id="diffBtn">ändern</button></span>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button role="tab" data-tab="atk" aria-selected="true">Angriff</button>
+      <button role="tab" data-tab="def" aria-selected="false">Abwehr</button>
+      <button role="tab" data-tab="eco" aria-selected="false">Gold</button>
+      <button role="tab" data-tab="spec" aria-selected="false">Kristalle</button>
+      <button role="tab" data-tab="tal" aria-selected="false">Sterne</button>
+      <button role="tab" data-tab="chal" aria-selected="false">Aufgaben</button>
+      <button role="tab" data-tab="ach" aria-selected="false">Erfolge</button>
+      <button role="tab" data-tab="stat" aria-selected="false">Statistik</button>
+    </div>
+
+    <div class="list" id="list"></div>
+
+    <section class="foot">
+      <div class="foot-row">
+        <div class="foot-txt">
+          <h2 id="pTitle">Neustart</h2>
+          <p id="pDesc"></p>
+        </div>
+        <button class="pbtn" id="pBtn"></button>
+      </div>
+      <div class="save-row">
+        <span id="saveInfo">Spielstand wird gespeichert</span>
+        <span class="save-acts">
+          <button id="exportBtn">exportieren</button>
+          <button id="importBtn">laden</button>
+          <button id="wipeBtn">löschen</button>
+        </span>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<script>
+/* =========================================================
+   1. BALANCING – alle Zahlen zum Schrauben stehen hier oben
+   ========================================================= */
+const C = {
+  enemyHp: 2,            // Leben eines normalen Gegners in Welle 1
+  enemyHpGrowth: 1.2,    // Grundwachstum pro Welle (entspricht Normal)
+  reward: 1,             // Gold pro normalem Gegner in Welle 1
+  rewardGrowth: 1.20,    // Goldwachstum pro Welle
+  bossEvery: 10,         // jede 10. Welle ist eine Boss-Welle
+  enemiesBase: 8,        // Gegner pro Welle (+ Welle × 0.6)
+  prestigeMinWave: 15,   // ab hier gibt es Sterne
+  starBonus: 0.10,       // +10 % Schaden und Gold pro Stern
+  bulletSpeed: 720,      // Pixel pro Sekunde
+  homingTurn: 26,        // Nachlenken der Schüsse (Bogenmaß pro Sekunde)
+  chainRadius: 170,      // Sprungweite für Kettentreffer
+  coreRadius: 29,       // Radius der Zelle; auf diesem Ring schlagen Gegner ein
+  saveEvery: 5,          // Spielstand alle 5 Sekunden sichern
+  offlineRate: 0.5,      // Offline bringt 50 % vom letzten Gold pro Sekunde
+  offlineMaxHours: 8,
+  offlineMinSec: 60,
+  autoBuyEvery: 0.6,     // Auto-Kauf prüft alle 0,6 Sekunden
+  crystalChance: 0.009,  // Wahrscheinlichkeit auf einen Kristall pro Abschuss
+  crystalBoss: 3,        // Kristalle pro besiegtem Boss
+  droneDmg: 0.6,         // Begleitschiff macht 60 % deines Schadens
+  droneRate: 0.5,        // und feuert halb so schnell wie du
+};
+const SAVE_KEY = 'ringwache.v2';
+
+/* Schwierigkeitsstufen: Multiplikatoren auf das Grundspiel.
+   fallback = Wellen zurück beim Schildbruch. */
+const DIFFS = [
+  { id:'easy',   name:'Entspannt', hpGrowth:1.17, speed:.85,  count:.85, elite:.5, reward:.8,
+    dmgTaken:.5, regen:.030, fallback:2, stars:.6, waveTime:28, escrow:0,
+    desc:'Wenige Gegner, viel Zeit, halber Schaden am Schild.', tag:'0,8× Gold' },
+  { id:'normal', name:'Normal',    hpGrowth:1.19, speed:1.05, count:1.1, elite:1.1, reward:1,
+    dmgTaken:1.2, regen:.015, fallback:3, stars:1, waveTime:22, escrow:0,
+    desc:'Fordernd, aber machbar. Eine Welle kommt in 22 Sekunden.', tag:'1× Gold' },
+  { id:'hard',   name:'Hart',      hpGrowth:1.26, speed:1.3, count:2.2, elite:2.2, reward:2.1,
+    dmgTaken:2.4, regen:.006, fallback:5, stars:3.5, waveTime:18, escrow:.35,
+    desc:'Etwa zweieinhalbmal so viele Gegner in 18 Sekunden. 35 % der Beute erst nach geräumter Welle.', tag:'2,1× Gold, 3,5× Sterne' },
+  { id:'brutal', name:'Brutal',    hpGrowth:1.3, speed:1.55, count:2.8, elite:3.4, reward:2.8,
+    dmgTaken:4.5, regen:.003, fallback:9, stars:9, waveTime:14, escrow:.5,
+    desc:'Dauerstrom aus allen Richtungen. Ein Durchbruch kostet neun Wellen und die halbe offene Beute.', tag:'2,8× Gold, 9× Sterne' },
+];
+
+/* Gegnertypen. hp/speed/reward sind Multiplikatoren, dmg = Schildschaden. */
+const TYPES = {
+  normal:   { r:14, hp:1,   speed:1,    reward:1,   dmg:1, color:'#ff5a6e', shape:'tri'   },
+  fast:     { r:10, hp:.5,  speed:1.85, reward:.8,  dmg:1, color:'#ff9f43', shape:'dart'  },
+  tank:     { r:20, hp:3.5, speed:.6,   reward:2.5, dmg:2, color:'#e85d9a', shape:'hex'   },
+  splitter: { r:17, hp:1.8, speed:.8,   reward:1.5, dmg:1, color:'#5ce1a0', shape:'blob'  },
+  shard:    { r:9,  hp:.35, speed:1.5,  reward:.5,  dmg:1, color:'#5ce1a0', shape:'blob'  },
+  ghost:    { r:13, hp:.8,  speed:1.1,  reward:1.8, dmg:1, color:'#b58cff', shape:'tri'   },
+  // Panzerung: schluckt 55 % jedes Treffers, Volltreffer lohnen sich hier
+  armor:    { r:18, hp:2.2, speed:.7,   reward:2.4, dmg:2, color:'#7fb3ff', shape:'shell', armor:.55 },
+  // Heiler: heilt alle Gegner in der Nähe, zuerst ausschalten
+  healer:   { r:15, hp:1.6, speed:.65,  reward:2.6, dmg:1, color:'#6ee7a8', shape:'cross', heal:.05, healR:150 },
+  // Regenerator: heilt sich selbst, wenn er zwei Sekunden nicht getroffen wurde
+  regen:    { r:16, hp:1.5, speed:.85,  reward:2,   dmg:1, color:'#ffd166', shape:'hex',   regen:.12 },
+  // Mücken kommen immer im Schwarm zu fünf
+  gnat:     { r:7,  hp:.22, speed:2.15, reward:.35, dmg:1, color:'#ffb84d', shape:'dart'  },
+  boss:     { r:38, hp:14,  speed:.45,  reward:15,  dmg:5, color:'#ff3864', shape:'star'  },
+};
+// Welcher Typ ab welcher Welle auftaucht. w = ab Welle, p = Grundgewicht,
+// elite = zählt als starker Typ und wird auf höheren Stufen häufiger.
+const SPAWN_TABLE = [
+  { kind:'normal',   w:1,  p:10 },
+  { kind:'fast',     w:3,  p:7  },
+  { kind:'tank',     w:6,  p:4,  elite:true },
+  { kind:'swarm',    w:7,  p:3  },
+  { kind:'splitter', w:8,  p:4,  elite:true },
+  { kind:'regen',    w:10, p:3,  elite:true },
+  { kind:'ghost',    w:12, p:3,  elite:true },
+  { kind:'armor',    w:14, p:3,  elite:true },
+  { kind:'healer',   w:16, p:2,  elite:true },
+];
+
+const ICONS = {
+  dmg:'<path d="M3 17 17 3"/><path d="M11 3h6v6"/>',
+  rate:'<path d="M11 2 5 11h4l-2 7 6-9h-4z"/>',
+  range:'<circle cx="10" cy="10" r="7" stroke-dasharray="3 3"/><circle cx="10" cy="10" r="1.6" fill="currentColor" stroke="none"/>',
+  multi:'<circle cx="4" cy="10" r="2"/><circle cx="10" cy="10" r="2"/><circle cx="16" cy="10" r="2"/>',
+  chain:'<path d="M2 13l4-4 4 4 4-4 4 4"/>',
+  crit:'<path d="M10 2l2.4 5 5.6.7-4 3.9 1 5.4L10 14.4 4.9 17l1-5.4-4-3.9 5.6-.7z"/>',
+  income:'<circle cx="10" cy="10" r="7"/><path d="M12.5 7.6a3.4 3.4 0 1 0 0 4.8"/>',
+  shield:'<path d="M10 2l6 2.6v4.9c0 3.9-2.9 6.1-6 8.1-3.1-2-6-4.2-6-8.1V4.6z"/>',
+  click:'<path d="M5 3l10 7-4.2 1 2.2 5-2 .9-2.2-5L5 15z"/>',
+  shock:'<circle cx="10" cy="10" r="2.5"/><path d="M10 3.5v-1M10 17.5v1M3.5 10h-1M17.5 10h1"/><circle cx="10" cy="10" r="6.5" stroke-dasharray="2 3"/>',
+  over:'<path d="M10 2 4.5 11H8l-1.5 7 5.5-9H8.5z"/><path d="M15 5l2.2 2.2L15 9.4"/>',
+  rush:'<circle cx="10" cy="10" r="6.2"/><path d="M10 6.2v7.6M8 8.4h4M8 11.6h4"/>',
+  check:'<path d="M4 10.5l4 4 8-9"/>',
+  drone:'<path d="M10 3l4 10-4-2-4 2z"/><circle cx="10" cy="9" r="1.2" fill="currentColor" stroke="none"/><path d="M3 16l3-2M17 16l-3-2"/>',
+};
+
+/* Upgrades: cat = Kategorie (atk/def/eco), val = Wert auf Stufe l */
+const UPGRADES = [
+  { id:'dmg',    cat:'atk', name:'Schaden',       base:10,  grow:1.185, max:Infinity,
+    val:l => (1 + 0.4*l) * Math.pow(2, Math.floor(l/15)),
+    show:v => fmt(v * dmgMult()), unit:'Schaden' },
+  { id:'rate',   cat:'atk', name:'Feuerrate',     base:16,  grow:1.225, max:60,
+    val:l => 1.25 * (1 + 0.1*l),
+    show:v => dec(v), unit:'Schuss/s' },
+  { id:'multi',  cat:'atk', name:'Mehrfachziel',  base:300, grow:5.5,  max:6,
+    val:l => 1 + l,
+    show:v => v, unit:'Ziele pro Salve' },
+  { id:'chain',  cat:'atk', name:'Kettentreffer', base:800, grow:6.5,  max:5,
+    val:l => l,
+    show:v => v, unit:'Sprünge' },
+  { id:'crit',   cat:'atk', name:'Volltreffer',   base:100, grow:1.65, max:10,
+    val:l => 0.05 * l,
+    show:v => Math.round(v*100) + ' %', unit:'für 3× Schaden' },
+  { id:'range',  cat:'def', name:'Reichweite',    base:40,  grow:1.55, max:12,
+    val:l => 0.24 + 0.022*l,
+    show:v => Math.round(v * minDim()), unit:'px Radius' },
+  { id:'shield', cat:'def', name:'Schild',        base:45,  grow:1.35, max:Infinity,
+    val:l => 10 + 4*l,
+    show:v => v, unit:'Schildpunkte' },
+  { id:'income', cat:'eco', name:'Goldfund',      base:75,  grow:1.45,  max:Infinity,
+    val:l => 1 + 0.2*l,
+    show:v => '+' + Math.round((v-1)*100) + ' %', unit:'Gold' },
+  { id:'click',  cat:'eco', name:'Klick-Kraft',   base:32,  grow:1.32, max:Infinity,
+    val:l => 3 + l,
+    show:v => '×' + v, unit:'Schaden pro Klick' },
+];
+const UP = Object.fromEntries(UPGRADES.map(u => [u.id, u]));
+
+/* Kristall-Läden: dauerhafte Sonderausrüstung, bleibt beim Neustart erhalten */
+const SPECIALS = [
+  { id:'drone',  name:'Begleitschiff', max:4, costs:[3, 7, 14, 24], icon:'drone',
+    desc:'Umkreist dich und feuert mit, nutzt alle deine Upgrades',
+    info:l => l ? `${l} im Einsatz, je ${Math.round(C.droneDmg*100)} % Schaden` : 'noch keins gekauft' },
+  { id:'range',  name:'Zielrechner',   max:3, costs:[4, 9, 18], icon:'range',
+    desc:'Erweitert deine Reichweite dauerhaft',
+    info:l => `+${l * 20} % Reichweite` },
+  { id:'gold',   name:'Goldmagnet',    max:4, costs:[3, 7, 14, 24], icon:'income',
+    desc:'Mehr Gold aus jedem Abschuss',
+    info:l => `+${l * 25} % Gold` },
+  { id:'shield', name:'Notschild',     max:4, costs:[5, 11, 20, 34], icon:'shield',
+    desc:'Der Schild heilt sich schneller von selbst',
+    info:l => `+${(l * .5).toFixed(1).replace('.', ',')} % Schild pro Sekunde` },
+];
+const SP = Object.fromEntries(SPECIALS.map(x => [x.id, x]));
+
+/* Zielpriorität: bestimmt, welchen Gegner im Kreis du zuerst beschießt */
+const AIMS = [
+  { id:'near',    name:'Nächster',  hint:'der Gegner, der dem Kern am nächsten ist' },
+  { id:'strong',  name:'Stärkster', hint:'der Gegner mit den meisten Lebenspunkten' },
+  { id:'fast',    name:'Schnellster', hint:'der Gegner mit dem höchsten Tempo' },
+  { id:'support', name:'Heiler',    hint:'zuerst Heiler und Regeneratoren' },
+];
+
+/* Sternen-Baum: Sterne werden ausgegeben, nicht mehr automatisch verrechnet.
+   req = Voraussetzung [Talent, Stufe]. Kosten = base + step × Stufe. */
+const TALENTS = [
+  { id:'power',  name:'Durchschlag',  max:10, base:1, step:1, info:l => `+${l*8} % Schaden` },
+  { id:'greed',  name:'Beutezug',     max:10, base:1, step:1, info:l => `+${l*8} % Gold` },
+  { id:'reach',  name:'Weitblick',    max:6,  base:2, step:1, info:l => `+${l*5} % Reichweite` },
+  { id:'bulwark',name:'Bollwerk',     max:6,  base:2, step:1, info:l => `+${l*10} % Schild, +${l*20} % Schildheilung` },
+  { id:'rapid',  name:'Taktgeber',    max:8,  base:2, step:1, req:['power',3], info:l => `+${l*4} % Feuerrate` },
+  { id:'vault',  name:'Kristallader', max:4,  base:3, step:2, req:['greed',3], info:l => `+${l*50} % Kristallchance` },
+  { id:'crit',   name:'Schwachstelle',max:5,  base:3, step:2, req:['rapid',2], info:l => `+${l*2} % Volltreffer` },
+  { id:'start',  name:'Vorsprung',    max:5,  base:4, step:3, req:['bulwark',2], info:l => `Neustart beginnt bei Welle ${1+l*3}` },
+  { id:'chainT', name:'Überschlag',   max:2,  base:8, step:6, req:['crit',2], info:l => `+${l} Kettensprung` },
+  { id:'swarmT', name:'Streufeuer',   max:2,  base:10, step:8, req:['rapid',4], info:l => `+${l} Ziel pro Salve` },
+];
+const TAL = Object.fromEntries(TALENTS.map(t => [t.id, t]));
+
+/* Herausforderungen: Sonderregeln gegen dauerhafte Belohnung */
+const CHALLENGES = [
+  { id:'noshield', name:'Nackt',            goal:20, rule:'noShield',
+    desc:'Welle 20 erreichen, ohne das Schild-Upgrade zu kaufen', reward:'dmg', amount:.10 },
+  { id:'noclick',  name:'Hände weg',        goal:25, rule:'noClick',
+    desc:'Welle 25 erreichen, Klicks richten keinen Schaden an', reward:'gold', amount:.15 },
+  { id:'speed',    name:'Blitzstart',       goal:15, rule:'timed', limit:300,
+    desc:'Welle 15 in fünf Minuten erreichen', reward:'crystal', amount:.5 },
+  { id:'brutal',   name:'Feuerprobe',       goal:25, rule:'brutal',
+    desc:'Welle 25 auf Brutal erreichen', reward:'dmg', amount:.20 },
+  { id:'solo',     name:'Ohne Begleitung',  goal:30, rule:'noDrone',
+    desc:'Welle 30 erreichen, Begleitschiffe feuern nicht', reward:'gold', amount:.25 },
+];
+const CH = Object.fromEntries(CHALLENGES.map(c => [c.id, c]));
+
+/* Erfolge geben kleine dauerhafte Boni und bleiben beim Prestige erhalten */
+const ACHS = [
+  { id:'w10',   name:'Erste Schritte',  hint:'Welle 10 erreichen',            dmg:.05,  test:() => S.bestWave >= 10 },
+  { id:'w25',   name:'Standhaft',       hint:'Welle 25 erreichen',            dmg:.10,  test:() => S.bestWave >= 25 },
+  { id:'w50',   name:'Unbeweglich',     hint:'Welle 50 erreichen',            dmg:.15,  test:() => S.bestWave >= 50 },
+  { id:'k500',  name:'Aufräumdienst',   hint:'500 Gegner abschießen',         gold:.05, test:() => S.st.kills >= 500 },
+  { id:'k5000', name:'Dauerfeuer',      hint:'5000 Gegner abschießen',        gold:.10, test:() => S.st.kills >= 5000 },
+  { id:'b3',    name:'Bossjäger',       hint:'3 Bosse besiegen',              gold:.08, test:() => S.st.bosses >= 3 },
+  { id:'b10',   name:'Kopfgeldjäger',   hint:'10 Bosse besiegen',             gold:.15, test:() => S.st.bosses >= 10 },
+  { id:'star1', name:'Erster Neustart', hint:'Einmal Sterne verdienen',       dmg:.10,  test:() => S.stars >= 1 },
+  { id:'hardc', name:'Härtetest',       hint:'Welle 20 auf Hart oder Brutal', gold:.12,
+    test:() => S.bestWave >= 20 && (S.diff === 'hard' || S.diff === 'brutal') },
+];
+
+/* =========================================================
+   2. Spielstand und Laufzeit-Zustand
+   ========================================================= */
+const S = {
+  gold: 0, wave: 1, bestWave: 1, stars: 0, buyMode: 1, diff: 'normal',
+  autoBuy: false, sound: false,
+  crystals: 0, aim: 'near', cleared: 0,   // cleared = höchste vollständig geräumte Welle
+  lv: Object.fromEntries(UPGRADES.map(u => [u.id, 0])),
+  sp: Object.fromEntries(SPECIALS.map(x => [x.id, 0])),
+  tal: Object.fromEntries(TALENTS.map(t => [t.id, 0])),
+  chDone: [], ch: null, chTime: 0,
+  done: [],
+  st: { kills: 0, bosses: 0, time: 0, clicks: 0, clickKills: 0, shots: 0, hits: 0,
+        dmg: 0, gold: 0, breaks: 0, rushed: 0, abilities: 0, prestiges: 0,
+        starsTotal: 0, bestEver: 1 },
+};
+const G = {
+  enemies:[], bullets:[], parts:[], texts:[], ripples:[], flashes:[], waves:[],
+  toSpawn:0, spawnT:0, spawnLeft:0, bossPending:false, pause:0, waveTotal:0, waveKilled:0,
+  cd:0, hp:10, shake:0, hitFlash:0, spin:0, t:0,
+  acc:0, accT:0, ips:0, shots:0, hits:0, drones:[],
+  autoT:0, tab:'atk', panel:false, queued:0, pendGold:0, pendCry:0, syn:[], dend:[],
+};
+const D = () => DIFFS.find(d => d.id === S.diff) || DIFFS[1];
+
+/* =========================================================
+   3. Hilfsfunktionen
+   ========================================================= */
+const TAU = Math.PI * 2;
+const SUF = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+const dec = n => n.toFixed(1).replace('.', ',');
+function fmt(n){
+  if (!isFinite(n)) return '∞';
+  if (n < 1000) return (n < 10 && n % 1 !== 0) ? dec(n) : String(Math.floor(n));
+  let i = 0;
+  while (n >= 1000 && i < SUF.length - 1){ n /= 1000; i++; }
+  if (n >= 1000) return n.toExponential(2).replace('.', ',');
+  return (n < 100 ? n.toFixed(n < 10 ? 2 : 1).replace('.', ',') : String(Math.floor(n))) + SUF[i];
+}
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const val = id => UP[id].val(S.lv[id]);
+const cost = (u, l) => Math.ceil(u.base * Math.pow(u.grow, l));
+const achBonus = key => S.done.reduce((s, id) => {
+  const a = ACHS.find(x => x.id === id);
+  return s + (a && a[key] ? a[key] : 0);
+}, 0);
+// Belohnungen abgeschlossener Herausforderungen
+const chalBonus = key => S.chDone.reduce((s, id) => {
+  const c = CH[id];
+  return s + (c && c.reward === key ? c.amount : 0);
+}, 0);
+const tal = id => S.tal[id] || 0;
+
+const dmgMult  = () => (1 + .08 * tal('power')) * (1 + achBonus('dmg'))  * (1 + chalBonus('dmg'));
+const goldMult = () => (1 + .08 * tal('greed')) * (1 + achBonus('gold')) * (1 + chalBonus('gold')) * (1 + S.sp.gold * .25);
+const baseDamage = () => val('dmg') * dmgMult();
+const fireRate = () => val('rate') * (1 + .04 * tal('rapid'));
+const shieldMax = () => Math.round(UP.shield.val(S.lv.shield) * (1 + .1 * tal('bulwark')));
+const shieldRegen = () => (D().regen + S.sp.shield * .005) * (1 + .2 * tal('bulwark'));
+const critChance = () => Math.min(.9, val('crit') + .02 * tal('crit'));
+const chainCount = () => val('chain') + tal('chainT');
+const multiCount = () => val('multi') + tal('swarmT');
+const crystalChance = () => C.crystalChance * (1 + .5 * tal('vault')) * (1 + chalBonus('crystal'));
+const chRule = r => S.ch && CH[S.ch] && CH[S.ch].rule === r;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = id => document.getElementById(id);
+const svgIcon = (path, cls) => `<svg class="${cls || ''}" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+
+/* =========================================================
+   4. Ton: kleiner Synthesizer, keine Audiodateien nötig
+   ========================================================= */
+const SFX = {
+  shot:  { type:'square',   f:520, to:300,  v:.03, d:.07 },
+  hit:   { type:'triangle', f:300, to:180,  v:.025, d:.06 },
+  kill:  { type:'sine',     f:660, to:990,  v:.045, d:.12 },
+  boss:  { type:'sawtooth', f:150, to:70,   v:.08, d:.6  },
+  hurt:  { type:'sawtooth', f:220, to:60,   v:.08, d:.3  },
+  buy:   { type:'sine',     f:880, to:1320, v:.045, d:.12 },
+  power: { type:'square',   f:440, to:1100, v:.055, d:.25 },
+};
+let actx = null, lastShot = -1;
+function audio(){
+  if (!S.sound) return null;
+  if (!actx){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC){ S.sound = false; return null; }
+    try { actx = new AC(); } catch (err){ S.sound = false; return null; }
+  }
+  if (actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function sfx(kind){
+  const a = audio(), p = SFX[kind];
+  if (!a || !p) return;
+  const now = a.currentTime;
+  if (kind === 'shot'){
+    if (now - lastShot < 0.05) return;
+    lastShot = now;
+  }
+  const o = a.createOscillator(), g = a.createGain();
+  o.connect(g); g.connect(a.destination);
+  o.type = p.type;
+  o.frequency.setValueAtTime(p.f, now);
+  o.frequency.exponentialRampToValueAtTime(p.to, now + p.d);
+  g.gain.setValueAtTime(p.v, now);
+  g.gain.exponentialRampToValueAtTime(.0001, now + p.d);
+  o.start(now); o.stop(now + p.d + .02);
+}
+
+/* =========================================================
+   5. Canvas
+   ========================================================= */
+const canvas = $('c');
+const ctx = canvas.getContext('2d');
+const stage = $('stage');
+const bg = document.createElement('canvas');
+const bgx = bg.getContext('2d');
+let W = 0, H = 0, CX = 0, CY = 0;
+const minDim = () => Math.min(W, H) || 600;
+const rangePx = () => val('range') * minDim() * (1 + S.sp.range * .2) * (1 + .05 * tal('reach'));
+
+function resize(){
+  const r = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const oldX = CX, oldY = CY;
+  W = r.width; H = r.height; CX = W / 2; CY = H / 2;
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  if (oldX){                       // alles mitverschieben, der Kern bleibt mittig
+    const dx = CX - oldX, dy = CY - oldY;
+    for (const e of G.enemies){ e.bx += dx; e.by += dy; e.x += dx; e.y += dy; }
+    for (const b of G.bullets){ b.x += dx; b.y += dy; }
+  }
+
+  bg.width = canvas.width; bg.height = canvas.height;
+  bgx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const maxR = Math.hypot(CX, CY);
+  const g = bgx.createRadialGradient(CX, CY, 0, CX, CY, maxR);
+  g.addColorStop(0, '#221e52'); g.addColorStop(.55, '#141232'); g.addColorStop(1, '#08071a');
+  bgx.fillStyle = g; bgx.fillRect(0, 0, W, H);
+  bgx.strokeStyle = 'rgba(139,124,255,.06)'; bgx.lineWidth = 1;
+  for (let rr = 60; rr < maxR; rr += 60){ bgx.beginPath(); bgx.arc(CX, CY, rr, 0, TAU); bgx.stroke(); }
+  for (let i = 0; i < 24; i++){
+    const a = i / 24 * TAU;
+    bgx.beginPath();
+    bgx.moveTo(CX + Math.cos(a) * 46, CY + Math.sin(a) * 46);
+    bgx.lineTo(CX + Math.cos(a) * maxR, CY + Math.sin(a) * maxR);
+    bgx.stroke();
+  }
+  if (G.syn && G.syn.length) updateCore(0);
+  const vg = bgx.createRadialGradient(CX, CY, maxR * .45, CX, CY, maxR);
+  vg.addColorStop(0, 'rgba(8,7,26,0)'); vg.addColorStop(1, 'rgba(8,7,26,.85)');
+  bgx.fillStyle = vg; bgx.fillRect(0, 0, W, H);
+}
+new ResizeObserver(resize).observe(stage);
+resize();
+
+/* =========================================================
+   6. Wellen und Gegner
+   ========================================================= */
+function startWave(){
+  const boss = S.wave % C.bossEvery === 0;
+  G.bossPending = boss;
+  G.toSpawn = waveCount();
+  G.waveTotal = G.toSpawn; G.waveKilled = 0; G.queued = 0;
+  // Alle Gegner einer Welle müssen innerhalb dieses Fensters eintreffen.
+  // Mehr Gegner bedeuten damit automatisch dichteren Anflug.
+  G.spawnLeft = D().waveTime;
+  G.spawnT = 0.3;
+  if (boss){
+    const w = $('bossWarn');
+    w.classList.remove('show'); void w.offsetWidth; w.classList.add('show');
+    sfx('boss');
+  }
+}
+function pickKind(){
+  if (G.bossPending){ G.bossPending = false; return 'boss'; }
+  const elite = D().elite;
+  let sum = 0;
+  const pool = [];
+  for (const e of SPAWN_TABLE){
+    if (S.wave < e.w) continue;
+    // Gewicht steigt mit der Welle, starke Typen zusätzlich je Schwierigkeit
+    const age = Math.min(2.2, 1 + (S.wave - e.w) * 0.035);
+    const w = e.p * age * (e.elite ? elite : 1);
+    sum += w;
+    pool.push([e.kind, sum]);
+  }
+  const r = Math.random() * sum;
+  for (const [kind, acc] of pool) if (r <= acc) return kind;
+  return 'normal';
+}
+function spawnEnemy(kind, atX, atY, countIt){
+  if (kind === 'swarm'){                      // Schwarm: fünf Mücken auf einmal
+    const a0 = Math.random() * TAU;
+    for (let k = 0; k < 5; k++){
+      const a = a0 + (k - 2) * 0.13;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      const edge = Math.min(Math.abs(CX / (ca || 1e-6)), Math.abs(CY / (sa || 1e-6))) + 40 + k * 14;
+      spawnEnemy('gnat', CX + ca * edge, CY + sa * edge, k === 0);
+    }
+    return;
+  }
+  const T = TYPES[kind];
+  let x, y, a;
+  if (atX === undefined){
+    a = Math.random() * TAU;
+    const ca0 = Math.cos(a), sa0 = Math.sin(a);
+    const edge = Math.min(Math.abs(CX / (ca0 || 1e-6)), Math.abs(CY / (sa0 || 1e-6))) + T.r + 20;
+    x = CX + ca0 * edge; y = CY + sa0 * edge;
+  } else {
+    x = atX; y = atY;
+    a = Math.atan2(y - CY, x - CX);
+  }
+  const ca = Math.cos(a), sa = Math.sin(a);
+  const hp = C.enemyHp * Math.pow(C.enemyHpGrowth * D().hpGrowth / 1.2, S.wave - 1) * T.hp;
+  const speed = minDim() * (0.05 + Math.min(S.wave, 80) * 0.0011) * T.speed * D().speed;
+  G.enemies.push({
+    kind, shape:T.shape, color:T.color, r:T.r, reward:T.reward, dmg:T.dmg,
+    bx:x, by:y, x, y, vx:-ca * speed, vy:-sa * speed, heading:a + Math.PI,
+    px:sa, py:-ca, sway: kind === 'fast' ? 14 : kind === 'ghost' ? 26 : 0,
+    hp, maxHp:hp, pending:0, dist:Math.hypot(x - CX, y - CY),
+    phase:Math.random() * TAU, flash:0, dead:false,
+    counted: atX === undefined || countIt === true,
+    armor: T.armor || 0, heal: T.heal || 0, healR: T.healR || 0, regenRate: T.regen || 0,
+    healT: 0, lastHit: -99, healed: 0,
+  });
+}
+function payout(){
+  const g = G.pendGold, c = G.pendCry;
+  G.pendGold = 0; G.pendCry = 0;
+  if (!g && !c) return;
+  S.gold += g; S.st.gold += g;
+  S.crystals += c; S.st.crystals = (S.st.crystals || 0) + c;
+  toast(c
+    ? `Welle gesichert: +${fmt(g)} Gold, +${c} Kristall${c > 1 ? 'e' : ''}`
+    : `Welle gesichert: +${fmt(g)} Gold`, 1800);
+}
+
+function waveCleared(){
+  G.queued = 0;
+  payout();                                  // jetzt gibt es die Beute
+  S.cleared = S.wave;                        // alles aus diesem Schub ist besiegt
+  S.wave++;
+  S.bestWave = Math.max(S.bestWave, S.wave);
+  S.st.bestEver = Math.max(S.st.bestEver || 1, S.wave);
+  G.pause = 0.9;
+  G.waves.push({ r: 30, life: .8 });
+}
+function damageBase(amount, e){
+  G.hp -= amount;
+  G.hitFlash = 0.35; G.shake = 7;
+  burst(e.x, e.y, '#ff5a6e', 12);
+  sfx('hurt');
+  if (G.hp <= 0){
+    // Rückfall zählt ab der letzten wirklich geräumten Welle, damit
+    // Vorziehen kein Schlupfloch ist.
+    const base = Math.min(S.wave, Math.max(1, S.cleared));
+    const back = Math.max(1, base - D().fallback);
+    const lost = S.wave - back;
+    const lostGold = G.pendGold, lostCry = G.pendCry;
+    G.pendGold = 0; G.pendCry = 0;
+    S.st.lostGold = (S.st.lostGold || 0) + lostGold;
+    S.wave = back;
+    S.cleared = Math.max(0, back - 1);
+    G.enemies.length = 0; G.bullets.length = 0; G.toSpawn = 0; G.bossPending = false;
+    G.queued = 0; S.st.breaks++;
+    G.hp = shieldMax(); G.pause = 1.4;
+    const beute = lostGold || lostCry
+      ? `, ${fmt(lostGold)} Gold${lostCry ? ` und ${lostCry} Kristalle` : ''} im Depot verloren`
+      : '';
+    toast(lost > D().fallback
+      ? `Schild gebrochen: zurück zu Welle ${back}, vorgezogene Wellen weg${beute}`
+      : `Schild gebrochen, zurück zu Welle ${back}${beute}`, 3600);
+  }
+}
+
+/* =========================================================
+   7. Zielsystem: Vorhalt, Nachlenken, kein Überkill
+   ========================================================= */
+function intercept(sx, sy, s, e){
+  const dx = e.x - sx, dy = e.y - sy;
+  const a = e.vx*e.vx + e.vy*e.vy - s*s;
+  const b = 2 * (dx*e.vx + dy*e.vy);
+  const c = dx*dx + dy*dy;
+  let t = 0;
+  const disc = b*b - 4*a*c;
+  if (disc >= 0 && Math.abs(a) > 1e-6){
+    const q = Math.sqrt(disc);
+    t = Math.max((-b - q) / (2*a), (-b + q) / (2*a), 0);
+  }
+  return [e.x + e.vx * t, e.y + e.vy * t];
+}
+// Bewertung nach gewählter Zielpriorität: höher ist wichtiger
+function aimScore(e){
+  switch (S.aim){
+    case 'strong':  return e.hp;
+    case 'fast':    return Math.hypot(e.vx, e.vy);
+    case 'support': return (e.heal ? 2e9 : e.regenRate ? 1e9 : 0) - e.dist;
+    default:        return -e.dist;
+  }
+}
+function pickTarget(){
+  const R = rangePx();
+  let best = null, bs = -Infinity;
+  for (const e of G.enemies){
+    if (e.dead || e.dist > R + e.r || e.pending >= e.hp) continue;   // kein Überkill
+    const sc = aimScore(e);
+    if (sc > bs){ bs = sc; best = e; }
+  }
+  return best;
+}
+function nearestEnemy(x, y, maxD, exclude){
+  const R = rangePx() * 1.1;
+  let best = null, bd = Infinity, bestFresh = false;
+  for (const e of G.enemies){
+    if (e.dead || exclude.includes(e) || e.dist > R + e.r) continue;
+    const dx = e.x - x, dy = e.y - y, d = dx*dx + dy*dy;
+    if (d > maxD * maxD) continue;
+    const fresh = e.pending < e.hp;
+    if ((fresh && !bestFresh) || (fresh === bestFresh && d < bd)){ best = e; bd = d; bestFresh = fresh; }
+  }
+  return best;
+}
+// Erwarteter Schaden an diesem Ziel, Panzerung eingerechnet
+const effDmg = (e, raw) => raw * (1 - (e.armor || 0));
+function aim(b, e){
+  b.target = e;
+  b.pend = effDmg(e, b.exp);
+  e.pending += b.pend;
+}
+function release(b){
+  if (b.target && !b.target.dead) b.target.pending = Math.max(0, b.target.pending - b.pend);
+  b.target = null;
+}
+function shoot(x, y, dmg, multi, chain, core){
+  let fired = 0;
+  for (let k = 0; k < multi; k++){
+    const t = pickTarget();
+    if (!t) break;
+    fired++;
+    const [px, py] = intercept(x, y, C.bulletSpeed, t);
+    const a = Math.atan2(py - y, px - x);
+    const off = core ? C.coreRadius + 3 : 7;
+    const b = {
+      x: x + Math.cos(a) * off, y: y + Math.sin(a) * off,
+      vx: Math.cos(a) * C.bulletSpeed, vy: Math.sin(a) * C.bulletSpeed,
+      target: null, pend: 0, exp: dmg, chain, hit: [], life: 2.2, counted: false,
+    };
+    aim(b, t);
+    G.bullets.push(b);
+    if (core) G.flashes.push({ a, life: .12 });
+    G.shots++; S.st.shots++;
+  }
+  if (fired) sfx('shot');
+  return fired > 0;
+}
+
+// Begleitschiffe kreisen und feuern mit deinen Werten
+function updateDrones(dt){
+  const want = S.sp.drone;
+  while (G.drones.length < want){
+    G.drones.push({ a: G.drones.length / Math.max(1, want) * TAU, cd: Math.random() * .5, x: CX, y: CY });
+  }
+  if (G.drones.length > want) G.drones.length = want;
+  const orbit = Math.max(C.coreRadius + 46, rangePx() * .45);
+  for (const d of G.drones){
+    d.a += dt * .55;
+    const r = orbit * (1 + Math.sin(G.t * .8 + d.a) * .04);
+    d.x = CX + Math.cos(d.a) * r;
+    d.y = CY + Math.sin(d.a) * r;
+    d.cd = Math.max(0, d.cd - dt);
+    if (d.cd <= 0 && !chRule('noDrone') && shoot(d.x, d.y, baseDamage() * C.droneDmg, 1, chainCount(), false)){
+      d.cd = 1 / (fireRate() * C.droneRate);
+      d.flash = .1;
+    }
+    if (d.flash > 0) d.flash -= dt;
+  }
+}
+
+/* =========================================================
+   8. Schaden, Abschuss, Effekte
+   ========================================================= */
+function hitEnemy(e, dmg, fromClick){
+  const crit = Math.random() < critChance();
+  if (crit) dmg *= 3;
+  if (e.armor) dmg *= 1 - e.armor;      // Panzerung schluckt einen Teil
+  S.st.dmg += Math.min(dmg, Math.max(0, e.hp));
+  e.hp -= dmg;
+  e.flash = 0.07;
+  e.lastHit = G.t;
+  const big = crit || fromClick;
+  addText(e.x + (Math.random() - .5) * e.r, e.y - e.r - 4, fmt(dmg),
+    crit ? '#ffc857' : fromClick ? '#4ee6c4' : 'rgba(238,236,255,.7)', big ? 19 : 12, .7);
+  if (e.hp <= 0 && !e.dead){ e.dead = true; kill(e); }
+  else if (!fromClick) sfx('hit');
+}
+function kill(e){
+  const r = C.reward * Math.pow(C.rewardGrowth, S.wave - 1) * e.reward * D().reward
+          * val('income') * goldMult() * (1);
+  // Auf harten Stufen wandert ein Anteil der Beute ins Depot und wird
+  // erst nach geräumter Welle ausgezahlt. Der Rest kommt sofort, damit
+  // man überhaupt anfangen kann.
+  const hold = D().escrow || 0;
+  const now = r * (1 - hold);
+  G.pendGold += r * hold;
+  S.gold += now; S.st.gold += now;
+  G.acc += r;
+  S.st.kills++;
+
+  // Kristalle: selten bei normalen Gegnern, sicher bei Bossen
+  let cr = 0;
+  if (e.kind === 'boss') cr = C.crystalBoss + Math.floor(S.wave / 30);
+  else if (Math.random() < crystalChance()) cr = 1;
+  if (cr){
+    // Kristalle sind ganzzahlig, daher entscheidet der Zufall je Stück
+    let held = 0;
+    for (let k = 0; k < cr; k++) if (Math.random() < hold) held++;
+    G.pendCry += held;
+    const keep = cr - held;
+    S.crystals += keep;
+    S.st.crystals = (S.st.crystals || 0) + keep;
+    addText(e.x, e.y - 18, `+${cr} Kristall${cr > 1 ? 'e' : ''}`, '#7ef0ff', 17, 1.6);
+    burst(e.x, e.y, '#7ef0ff', 14);
+    sfx('buy');
+  }
+  if (e.kind === 'boss'){ S.st.bosses++; G.shake = 10; }
+  if (e.counted) G.waveKilled++;
+  addText(e.x, e.y, '+' + fmt(r), '#ffd166', e.kind === 'boss' ? 26 : 15, 1.1);
+  burst(e.x, e.y, e.color, e.kind === 'boss' ? 45 : 12);
+  sfx('kill');
+  if (e.kind === 'splitter'){                 // zerfällt in zwei kleine Splitter
+    for (let k = 0; k < 2; k++){
+      const a = Math.atan2(e.y - CY, e.x - CX) + (k ? .5 : -.5);
+      spawnEnemy('shard', e.x + Math.cos(a) * 14, e.y + Math.sin(a) * 14);
+    }
+  }
+}
+function addText(x, y, txt, color, size, life){
+  G.texts.push({ x, y, txt, color, size, life, life0: life });
+  if (G.texts.length > 80) G.texts.shift();
+}
+function burst(x, y, color, n){
+  if (reduceMotion) n = Math.ceil(n / 3);
+  for (let i = 0; i < n; i++){
+    const a = Math.random() * TAU, s = 40 + Math.random() * 170, life = .4 + Math.random() * .5;
+    G.parts.push({ x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life, life0: life, color, size: 1.5 + Math.random() * 2.5 });
+  }
+  if (G.parts.length > 450) G.parts.splice(0, G.parts.length - 450);
+}
+
+canvas.addEventListener('pointerdown', ev => {
+  audio();
+  const r = canvas.getBoundingClientRect();
+  const x = ev.clientX - r.left, y = ev.clientY - r.top;
+  G.ripples.push({ x, y, life: .45 });
+  S.st.clicks++;
+  let best = null, bd = Infinity;
+  for (const e of G.enemies){
+    if (e.dead) continue;
+    const d = Math.hypot(e.x - x, e.y - y);
+    if (d < e.r + 24 && d < bd){ bd = d; best = e; }
+  }
+  if (best && chRule('noClick')){
+    addText(best.x, best.y - best.r - 6, 'kein Klickschaden', '#ff5a6e', 12, .8);
+  } else if (best){
+    const wasAlive = !best.dead;
+    hitEnemy(best, baseDamage() * val('click'), true);
+    if (wasAlive && best.dead) S.st.clickKills++;
+  }
+});
+
+/* =========================================================
+   10. Spiellogik pro Frame
+   ========================================================= */
+function update(dt){
+  if (G.panel) return;            // Upgrades offen: Spiel steht
+  G.t += dt; S.st.time += dt;
+  const maxHp = shieldMax();
+  G.hp = Math.min(maxHp, G.hp + maxHp * shieldRegen() * dt);
+  G.spin += dt * (0.8 + fireRate() * 0.5);
+  updateCore(dt);
+
+  if (G.pause > 0){
+    G.pause -= dt;
+    if (G.pause <= 0) startWave();
+  } else if (G.toSpawn > 0){
+    G.spawnLeft = Math.max(0, G.spawnLeft - dt);
+    G.spawnT -= dt;
+    if (G.spawnT <= 0){
+      spawnEnemy(pickKind());
+      G.toSpawn--;
+      // Restzeit gleichmäßig auf die restlichen Gegner verteilen, mit etwas Streuung
+      const step = G.toSpawn > 0 ? G.spawnLeft / G.toSpawn : 0;
+      G.spawnT = Math.max(0.05, step * (0.65 + Math.random() * 0.7));
+    }
+  } else if (G.enemies.length === 0){
+    waveCleared();
+  }
+
+  for (const e of G.enemies){
+    if (e.dead) continue;
+    if (e.healed > 0) e.healed -= dt;
+    // Regenerator heilt sich, solange er zwei Sekunden nicht getroffen wurde
+    if (e.regenRate && G.t - e.lastHit > 2 && e.hp < e.maxHp){
+      e.hp = Math.min(e.maxHp, e.hp + e.maxHp * e.regenRate * dt);
+    }
+    // Heiler pflegt alle Gegner in seiner Nähe
+    if (e.heal){
+      e.healT -= dt;
+      if (e.healT <= 0){
+        e.healT = 0.8;
+        for (const o of G.enemies){
+          if (o === e || o.dead || o.hp >= o.maxHp) continue;
+          if (Math.hypot(o.x - e.x, o.y - e.y) > e.healR) continue;
+          o.hp = Math.min(o.maxHp, o.hp + o.maxHp * e.heal);
+          o.healed = .5;
+        }
+      }
+    }
+    e.bx += e.vx * dt; e.by += e.vy * dt;
+    const s = e.sway ? Math.sin(G.t * 4 + e.phase) * e.sway : 0;
+    e.x = e.bx + e.px * s; e.y = e.by + e.py * s;
+    e.dist = Math.hypot(e.x - CX, e.y - CY);
+    if (e.flash > 0) e.flash -= dt;
+    if (e.dist <= C.coreRadius + e.r * .5){
+      e.dead = true;
+      damageBase(e.dmg * D().dmgTaken, e);
+    }
+  }
+
+  G.cd = Math.max(0, G.cd - dt);
+  if (G.cd <= 0 && shoot(CX, CY, baseDamage(), multiCount(), chainCount(), true)) G.cd = 1 / fireRate();
+  updateDrones(dt);
+
+  for (let i = G.bullets.length - 1; i >= 0; i--){
+    const b = G.bullets[i];
+    if (b.target && b.target.dead) b.target = null;
+    if (!b.target){
+      const nt = nearestEnemy(b.x, b.y, minDim(), b.hit);
+      if (nt) aim(b, nt);
+    }
+    if (b.target){
+      const [px, py] = intercept(b.x, b.y, C.bulletSpeed, b.target);
+      const want = Math.atan2(py - b.y, px - b.x);
+      let cur = Math.atan2(b.vy, b.vx);
+      const d = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
+      const turn = C.homingTurn * dt;
+      cur += clamp(d, -turn, turn);
+      b.vx = Math.cos(cur) * C.bulletSpeed; b.vy = Math.sin(cur) * C.bulletSpeed;
+    }
+    b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+    if (b.life <= 0 || b.x < -60 || b.x > W + 60 || b.y < -60 || b.y > H + 60){
+      release(b); G.bullets.splice(i, 1); continue;
+    }
+    for (const e of G.enemies){
+      if (e.dead || b.hit.includes(e)) continue;
+      const dx = e.x - b.x, dy = e.y - b.y, rr = e.r + 5;
+      if (dx*dx + dy*dy < rr*rr){
+        release(b);
+        b.hit.push(e);
+        if (!b.counted){ b.counted = true; G.hits++; S.st.hits++; }
+        hitEnemy(e, b.exp, false);
+        const next = b.chain > 0 ? nearestEnemy(e.x, e.y, C.chainRadius, b.hit) : null;
+        if (next){ b.chain--; aim(b, next); b.life = Math.max(b.life, 1); }
+        else G.bullets.splice(i, 1);
+        break;
+      }
+    }
+  }
+  G.enemies = G.enemies.filter(e => !e.dead);
+
+  for (let i = G.parts.length - 1; i >= 0; i--){
+    const p = G.parts[i];
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vx *= 1 - 2.5 * dt; p.vy *= 1 - 2.5 * dt;
+    if ((p.life -= dt) <= 0) G.parts.splice(i, 1);
+  }
+  for (let i = G.texts.length - 1; i >= 0; i--){
+    G.texts[i].y -= 38 * dt;
+    if ((G.texts[i].life -= dt) <= 0) G.texts.splice(i, 1);
+  }
+  for (let i = G.ripples.length - 1; i >= 0; i--) if ((G.ripples[i].life -= dt) <= 0) G.ripples.splice(i, 1);
+  for (let i = G.flashes.length - 1; i >= 0; i--) if ((G.flashes[i].life -= dt) <= 0) G.flashes.splice(i, 1);
+  for (let i = G.waves.length - 1; i >= 0; i--){
+    const w = G.waves[i];
+    w.r += (w.strong ? rangePx() * 2.2 : 260) * dt;
+    if ((w.life -= dt) <= 0) G.waves.splice(i, 1);
+  }
+  G.shake = Math.max(0, G.shake - dt * 30);
+  G.hitFlash = Math.max(0, G.hitFlash - dt);
+
+  G.accT += dt;
+  if (G.accT >= 1){
+    G.ips = G.ips ? G.ips * .6 + (G.acc / G.accT) * .4 : G.acc / G.accT;
+    G.acc = 0; G.accT = 0;
+  }
+
+  if (S.autoBuy){
+    G.autoT += dt;
+    if (G.autoT >= C.autoBuyEvery){
+      G.autoT = 0;
+      let best = null, bc = Infinity;
+      for (const u of UPGRADES){
+        if (S.lv[u.id] >= u.max) continue;
+        const c = cost(u, S.lv[u.id]);
+        if (c < bc){ bc = c; best = u; }
+      }
+      if (best && S.gold >= bc){
+        const m = S.buyMode; S.buyMode = 1; buy(best, true); S.buyMode = m;
+      }
+    }
+  }
+
+  checkAchievements();
+  checkChallenge(dt);
+}
+
+/* Läuft eine Herausforderung, prüft das hier Ziel und Zeitlimit */
+function checkChallenge(dt){
+  if (!S.ch) return;
+  const c = CH[S.ch];
+  if (!c){ S.ch = null; return; }
+  if (c.rule === 'timed'){
+    S.chTime += dt;
+    if (S.chTime > c.limit && S.bestWave < c.goal){
+      toast(`${c.name} nicht geschafft: Zeit abgelaufen`, 3500);
+      endChallenge(false);
+      return;
+    }
+  }
+  if (S.bestWave >= c.goal){
+    if (!S.chDone.includes(c.id)) S.chDone.push(c.id);
+    const label = c.reward === 'dmg' ? 'Schaden' : c.reward === 'gold' ? 'Gold' : 'Kristallchance';
+    toast(`${c.name} geschafft: dauerhaft +${Math.round(c.amount*100)} % ${label}`, 4000);
+    sfx('power');
+    endChallenge(true);
+  }
+}
+
+function resetRun(startWaveNum){
+  S.gold = 0;
+  G.pendGold = 0; G.pendCry = 0;
+  S.wave = Math.max(1, startWaveNum || 1);
+  S.bestWave = S.wave;
+  S.cleared = S.wave - 1;
+  for (const k in S.lv) S.lv[k] = 0;
+  G.enemies.length = 0; G.bullets.length = 0; G.toSpawn = 0;
+  G.bossPending = false; G.queued = 0;
+  G.hp = shieldMax(); G.pause = 1.2;
+}
+
+function startChallenge(c){
+  if (S.chDone.includes(c.id)) return;
+  S.ch = c.id; S.chTime = 0;
+  if (c.rule === 'brutal') S.diff = 'brutal';
+  resetRun(1);
+  toast(`${c.name} gestartet: ${c.desc}`, 4000);
+  save(); renderUI(); renderList();
+}
+
+function endChallenge(){
+  S.ch = null; S.chTime = 0;
+  resetRun(1 + tal('start') * 3);
+  save(); renderUI(); renderList();
+}
+
+function checkAchievements(){
+  for (const a of ACHS){
+    if (S.done.includes(a.id) || !a.test()) continue;
+    S.done.push(a.id);
+    const b = a.dmg ? `+${Math.round(a.dmg*100)} % Schaden` : `+${Math.round(a.gold*100)} % Gold`;
+    toast(`Erfolg: ${a.name} (${b})`, 3200);
+    sfx('buy');
+    if (G.tab === 'ach') renderList();
+  }
+}
+
+/* =========================================================
+   11. Zeichnen
+   ========================================================= */
+/* Das Zentrum ist eine Nervenzelle: ein weicher Zellkern, ein verzweigtes
+   Dendriten-Geflecht und Signale, die auf den Bahnen nach außen und innen
+   wandern. Dazu frei treibende Vesikel, die sich kurz ankoppeln.
+   Alle Koordinaten sind relativ zur Mitte, damit die Zelle bei jeder
+   Fenstergröße ohne Neuaufbau mittig bleibt. */
+function buildCore(){
+  const segs = [], paths = [];
+
+  function grow(x, y, a, len, depth, trail){
+    const ex = x + Math.cos(a) * len, ey = y + Math.sin(a) * len;
+    const seg = { x1:x, y1:y, x2:ex, y2:ey, depth, ph:Math.random() * TAU };
+    segs.push(seg);
+    const here = trail.concat([{ x:ex, y:ey }]);
+    if (depth >= 3){
+      paths.push(here);                       // Endknopf: hier enden Signale
+      seg.bouton = true;
+      return;
+    }
+    const kids = depth === 0 ? 2 : (Math.random() < .65 ? 2 : 1);
+    for (let k = 0; k < kids; k++){
+      const spread = (kids === 1 ? 0 : (k - (kids - 1) / 2)) * (.55 + Math.random() * .4);
+      grow(ex, ey, a + spread + (Math.random() - .5) * .2, len * (.62 + Math.random() * .18), depth + 1, here);
+    }
+  }
+
+  const roots = 7;
+  for (let i = 0; i < roots; i++){
+    const a = i / roots * TAU + Math.random() * .3;
+    const r0 = C.coreRadius * .3;                       // Start am Rand des Zellkörpers
+    grow(Math.cos(a) * r0, Math.sin(a) * r0, a, C.coreRadius * (.3 + Math.random() * .1), 0,
+         [{ x:Math.cos(a) * r0 * .5, y:Math.sin(a) * r0 * .5 }]);
+  }
+
+  // Nichts darf über die Einschlagzone hinausragen: alles gemeinsam einpassen
+  const limit = C.coreRadius * .93;
+  let far = 0;
+  for (const g of segs) far = Math.max(far, Math.hypot(g.x2, g.y2), Math.hypot(g.x1, g.y1));
+  if (far > limit){
+    const f = limit / far;
+    for (const g of segs){ g.x1 *= f; g.y1 *= f; g.x2 *= f; g.y2 *= f; }
+    for (const pth of paths) for (const pt of pth){ pt.x *= f; pt.y *= f; }
+  }
+
+  // Längen je Pfad vorberechnen, damit Signale gleichmäßig wandern
+  for (const pth of paths){
+    pth.cum = [0];
+    for (let i = 1; i < pth.length; i++){
+      pth.cum.push(pth.cum[i-1] + Math.hypot(pth[i].x - pth[i-1].x, pth[i].y - pth[i-1].y));
+    }
+    pth.len = pth.cum[pth.cum.length - 1] || 1;
+  }
+
+  G.tree = segs;
+  G.paths = paths;
+  G.sig = [];
+  for (let i = 0; i < 8; i++) G.sig.push(newSignal(Math.random()));
+  G.ves = [];
+  for (let i = 0; i < 5; i++){
+    G.ves.push({
+      rad: C.coreRadius * (.5 + Math.random() * .35),
+      a: Math.random() * TAU,
+      sp: (Math.random() < .5 ? -1 : 1) * (.18 + Math.random() * .4),
+      wob: .06 + Math.random() * .12, wp: Math.random() * TAU,
+      size: 1 + Math.random() * .9, x:0, y:0,
+    });
+  }
+  G.boutons = [];                             // Aufleuchten der Endknöpfe
+}
+
+function newSignal(t){
+  const pth = G.paths[Math.floor(Math.random() * G.paths.length)];
+  return {
+    p: pth, t: t || 0,
+    sp: 13 + Math.random() * 10,          // Pixel pro Sekunde
+    dir: Math.random() < .72 ? 1 : -1,        // meist nach außen
+    size: .55 + Math.random() * .55,
+  };
+}
+buildCore();
+
+// Punkt auf dem Geflecht, leicht wehend um die Mitte gedreht
+function sway(x, y, ph){
+  const s = Math.sin(G.t * .75 + ph) * .045;
+  const c = Math.cos(s), si = Math.sin(s);
+  return [CX + x * c - y * si, CY + x * si + y * c];
+}
+
+function updateCore(dt){
+  const fast = 1;
+  for (let i = G.sig.length - 1; i >= 0; i--){
+    const g = G.sig[i];
+    g.t += g.sp * g.dir * dt * fast / g.p.len;
+    if (g.t >= 1){
+      G.boutons.push({ p:g.p[g.p.length-1], life:.3 });   // am Endknopf entladen
+      G.sig[i] = newSignal(0);
+    } else if (g.t <= 0){
+      G.sig[i] = newSignal(1);                             // im Zellkern angekommen
+      G.sig[i].dir = 1;
+      G.sig[i].t = 0;
+    }
+  }
+  for (const v of G.ves){
+    v.a += v.sp * dt * fast;
+    const r = v.rad * (1 + Math.sin(G.t * 1.1 + v.wp) * v.wob);
+    v.x = CX + Math.cos(v.a) * r;
+    v.y = CY + Math.sin(v.a) * r;
+  }
+  for (let i = G.boutons.length - 1; i >= 0; i--){
+    if ((G.boutons[i].life -= dt) <= 0) G.boutons.splice(i, 1);
+  }
+  if (G.boutons.length > 20) G.boutons.splice(0, G.boutons.length - 20);
+}
+
+// Position eines Signals auf seinem Pfad
+function sigPos(g){
+  const d = g.t * g.p.len, cum = g.p.cum;
+  let i = 1;
+  while (i < cum.length - 1 && cum[i] < d) i++;
+  const f = (d - cum[i-1]) / Math.max(.001, cum[i] - cum[i-1]);
+  const a = g.p[i-1], b = g.p[i];
+  return sway(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, i * .7);
+}
+
+function drawSynapses(){
+  const hot = false;
+  const fib = hot ? '255,200,87' : '150,132,255';
+  const spark = hot ? '255,243,196' : '158,240,255';
+
+  // 1. Dendriten: nach außen dünner werdende Fasern
+  ctx.lineCap = 'round';
+  for (const s of G.tree){
+    const [x1, y1] = sway(s.x1, s.y1, s.ph * .2);
+    const [x2, y2] = sway(s.x2, s.y2, s.ph * .2 + .3);
+    ctx.strokeStyle = `rgba(${fib},${.42 - s.depth * .08})`;
+    ctx.lineWidth = 1.9 - s.depth * .38;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    if (s.bouton){
+      ctx.fillStyle = `rgba(${fib},.5)`;
+      ctx.beginPath(); ctx.arc(x2, y2, 1.2, 0, TAU); ctx.fill();
+    }
+  }
+
+  ctx.globalCompositeOperation = 'lighter';
+
+  // 2. Entladungen an den Endknöpfen
+  for (const b of G.boutons){
+    const k = b.life / .3;
+    const [x, y] = sway(b.p.x, b.p.y, .4);
+    ctx.fillStyle = `rgba(${spark},${k * .45})`;
+    ctx.beginPath(); ctx.arc(x, y, 1.2 + (1 - k) * 3.5, 0, TAU); ctx.fill();
+  }
+
+  // 3. Wandernde Signale mit kurzer Spur
+  for (const g of G.sig){
+    const [x, y] = sigPos(g);
+    const tail = { ...g, t: clamp(g.t - g.dir * .05, 0, 1) };
+    const [tx, ty] = sigPos(tail);
+    ctx.strokeStyle = `rgba(${spark},.5)`;
+    ctx.lineWidth = g.size * .9;
+    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(x, y); ctx.stroke();
+    ctx.shadowColor = hot ? '#ffc857' : '#7ef0ff';
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = `rgba(${spark},.95)`;
+    ctx.beginPath(); ctx.arc(x, y, g.size + .35, 0, TAU); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // 4. Vesikel treiben umher und koppeln kurz an nahe Endknöpfe an
+  for (const v of G.ves){
+    let near = null, nd = 24;
+    for (const pth of G.paths){
+      const [bx, by] = sway(pth[pth.length-1].x, pth[pth.length-1].y, .4);
+      const d = Math.hypot(bx - v.x, by - v.y);
+      if (d < nd){ nd = d; near = [bx, by]; }
+    }
+    if (near){
+      ctx.strokeStyle = `rgba(${spark},${(1 - nd / 24) * .4})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(v.x, v.y); ctx.lineTo(near[0], near[1]); ctx.stroke();
+    }
+    const halo = ctx.createRadialGradient(v.x, v.y, 0, v.x, v.y, v.size * 3);
+    halo.addColorStop(0, `rgba(${spark},.5)`);
+    halo.addColorStop(1, `rgba(${spark},0)`);
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(v.x, v.y, v.size * 3, 0, TAU); ctx.fill();
+    ctx.fillStyle = `rgba(${spark},.9)`;
+    ctx.beginPath(); ctx.arc(v.x, v.y, v.size, 0, TAU); ctx.fill();
+  }
+
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.lineCap = 'butt';
+}
+
+function drawEnemy(e){
+  const r = e.r;
+  ctx.save();
+  ctx.translate(e.x, e.y);
+  if (e.kind === 'ghost') ctx.globalAlpha = .55 + Math.sin(G.t * 3 + e.phase) * .25;
+  ctx.fillStyle = e.flash > 0 ? '#fff' : e.color;
+  ctx.shadowColor = e.color;
+  ctx.shadowBlur = e.kind === 'boss' ? 26 : 10;
+  ctx.beginPath();
+  if (e.shape === 'tri'){
+    ctx.rotate(e.heading);
+    ctx.moveTo(r, 0); ctx.lineTo(-r*.8, r*.75); ctx.lineTo(-r*.4, 0); ctx.lineTo(-r*.8, -r*.75);
+  } else if (e.shape === 'dart'){
+    ctx.rotate(e.heading);
+    ctx.moveTo(r*1.3, 0); ctx.lineTo(-r, r*.55); ctx.lineTo(-r, -r*.55);
+  } else if (e.shape === 'hex'){
+    ctx.rotate(G.t * .6 + e.phase);
+    for (let k = 0; k < 6; k++) ctx.lineTo(Math.cos(k*TAU/6)*r, Math.sin(k*TAU/6)*r);
+  } else if (e.shape === 'shell'){
+    ctx.rotate(e.heading);
+    ctx.moveTo(r * .2, -r); ctx.lineTo(r, -r * .45); ctx.lineTo(r, r * .45);
+    ctx.lineTo(r * .2, r); ctx.lineTo(-r * .9, r * .5); ctx.lineTo(-r * .9, -r * .5);
+  } else if (e.shape === 'cross'){
+    ctx.rotate(G.t * .5 + e.phase);
+    const a1 = r * .34, a2 = r;
+    ctx.moveTo(-a1, -a2); ctx.lineTo(a1, -a2); ctx.lineTo(a1, -a1); ctx.lineTo(a2, -a1);
+    ctx.lineTo(a2, a1); ctx.lineTo(a1, a1); ctx.lineTo(a1, a2); ctx.lineTo(-a1, a2);
+    ctx.lineTo(-a1, a1); ctx.lineTo(-a2, a1); ctx.lineTo(-a2, -a1); ctx.lineTo(-a1, -a1);
+  } else if (e.shape === 'blob'){
+    for (let k = 0; k <= 18; k++){
+      const a = k / 18 * TAU;
+      const rr = r * (1 + Math.sin(a * 3 + G.t * 2 + e.phase) * .14);
+      ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+  } else {
+    ctx.rotate(G.t * .8 + e.phase);
+    for (let k = 0; k < 16; k++){
+      const rr = k % 2 ? r * .55 : r;
+      ctx.lineTo(Math.cos(k*TAU/16)*rr, Math.sin(k*TAU/16)*rr);
+    }
+  }
+  ctx.closePath(); ctx.fill();
+  ctx.shadowBlur = 0;
+  if (e.armor){ ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 3.5; }
+  else { ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 1.5; }
+  ctx.stroke();
+  ctx.restore();
+
+  if (e.heal){                                   // Reichweite des Heilers
+    ctx.strokeStyle = 'rgba(110,231,168,.28)'; ctx.lineWidth = 1;
+    ctx.setLineDash([4, 6]); ctx.lineDashOffset = -G.t * 10;
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.healR, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  if (e.healed > 0){                             // gerade geheilt worden
+    ctx.strokeStyle = `rgba(110,231,168,${e.healed / .5})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(e.x, e.y, r + 5, 0, TAU); ctx.stroke();
+  }
+
+  // Balken plus Zahl, damit die Stärke des Gegners ablesbar ist
+  const barW = Math.max(26, r * 1.7), barH = e.kind === 'boss' ? 5 : 3, barY = e.y - r - 11;
+  ctx.fillStyle = 'rgba(8,7,26,.72)'; ctx.fillRect(e.x - barW/2, barY, barW, barH);
+  ctx.fillStyle = e.hp < e.maxHp ? '#c9bfff' : 'rgba(201,191,255,.55)';
+  ctx.fillRect(e.x - barW/2, barY, barW * clamp(e.hp / e.maxHp, 0, 1), barH);
+  ctx.textAlign = 'center';
+  ctx.font = `600 ${e.kind === 'boss' ? 15 : 11}px "Chakra Petch", system-ui, sans-serif`;
+  ctx.fillStyle = e.kind === 'boss' ? '#ffd166' : 'rgba(238,236,255,.82)';
+  ctx.fillText(fmt(Math.max(0, e.hp)), e.x, barY - 4);
+  if (e.pending > 0){
+    ctx.save();
+    ctx.translate(e.x, e.y); ctx.rotate(G.t * 3);
+    ctx.strokeStyle = 'rgba(255,200,87,.85)'; ctx.lineWidth = 1.5;
+    for (let k = 0; k < 4; k++){
+      ctx.beginPath(); ctx.arc(0, 0, r + 7, k*Math.PI/2 - .35, k*Math.PI/2 + .35); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+// Pfeile am Bildrand für Gegner, die noch außerhalb des Sichtfelds sind
+function drawEdgeMarks(){
+  for (const e of G.enemies){
+    if (e.x > -8 && e.x < W + 8 && e.y > -8 && e.y < H + 8) continue;
+    const a = Math.atan2(e.y - CY, e.x - CX), m = 16;
+    ctx.save();
+    ctx.translate(clamp(e.x, m, W - m), clamp(e.y, m, H - m));
+    ctx.rotate(a);
+    ctx.globalAlpha = .75;
+    ctx.fillStyle = e.color;
+    ctx.beginPath(); ctx.moveTo(7, 0); ctx.lineTo(-5, 5); ctx.lineTo(-5, -5); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawRange(){
+  const R = rangePx(), hot = false;
+  ctx.fillStyle = hot ? 'rgba(255,200,87,.07)' : 'rgba(139,124,255,.055)';
+  ctx.beginPath(); ctx.arc(CX, CY, R, 0, TAU); ctx.fill();
+  if (ctx.createConicGradient && !reduceMotion){
+    const sweep = ctx.createConicGradient(G.t * 1.1, CX, CY);
+    sweep.addColorStop(0, 'rgba(139,124,255,.22)');
+    sweep.addColorStop(.1, 'rgba(139,124,255,0)');
+    sweep.addColorStop(1, 'rgba(139,124,255,0)');
+    ctx.fillStyle = sweep;
+    ctx.beginPath(); ctx.arc(CX, CY, R, 0, TAU); ctx.fill();
+  }
+  ctx.strokeStyle = hot ? 'rgba(255,200,87,.7)' : 'rgba(139,124,255,.6)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([10, 8]); ctx.lineDashOffset = -G.t * 14;
+  ctx.beginPath(); ctx.arc(CX, CY, R, 0, TAU); ctx.stroke();
+  ctx.setLineDash([]);
+
+  for (const w of G.waves){
+    ctx.strokeStyle = w.strong ? `rgba(78,230,196,${w.life / .55})` : `rgba(139,124,255,${w.life / .8 * .6})`;
+    ctx.lineWidth = w.strong ? 4 : 2;
+    ctx.beginPath(); ctx.arc(CX, CY, w.r, 0, TAU); ctx.stroke();
+  }
+}
+
+function drawCore(){
+  const cr = C.coreRadius;
+  const hot = false;
+  const tint = hot ? '255,200,87' : '150,132,255';
+  const spark = hot ? '255,243,196' : '158,240,255';
+
+  // weiches Leuchten unter der Zelle
+  const glow = ctx.createRadialGradient(CX, CY, 0, CX, CY, cr * 1.7);
+  glow.addColorStop(0, `rgba(${tint},.22)`);
+  glow.addColorStop(.4, `rgba(${tint},.07)`);
+  glow.addColorStop(1, `rgba(${tint},0)`);
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(CX, CY, cr * 1.7, 0, TAU); ctx.fill();
+
+  drawSynapses();
+
+  // Zellmembran: unruhige, weiche Hülle
+  const beat = 1 + Math.sin(G.t * (1.6 + fireRate() * .18)) * .05;
+  ctx.beginPath();
+  for (let k = 0; k <= 40; k++){
+    const a = k / 40 * TAU;
+    const rr = cr * .34 * beat * (1
+      + Math.sin(a * 3 + G.t * 1.1) * .055
+      + Math.sin(a * 5 - G.t * .7) * .035
+      + Math.sin(a * 2 + G.t * .4) * .03);
+    ctx.lineTo(CX + Math.cos(a) * rr, CY + Math.sin(a) * rr);
+  }
+  ctx.closePath();
+  const body = ctx.createRadialGradient(CX - cr * .12, CY - cr * .14, cr * .04, CX, CY, cr * .4);
+  body.addColorStop(0, `rgba(${spark},.5)`);
+  body.addColorStop(.45, `rgba(${tint},.34)`);
+  body.addColorStop(1, 'rgba(20,18,50,.5)');
+  ctx.fillStyle = body; ctx.fill();
+  ctx.strokeStyle = `rgba(${spark},.45)`; ctx.lineWidth = 1.2; ctx.stroke();
+
+  ctx.globalCompositeOperation = 'lighter';
+
+  // Zellkern innen, atmet mit der Feuerrate
+  const nuc = ctx.createRadialGradient(CX, CY, 0, CX, CY, cr * .22);
+  nuc.addColorStop(0, `rgba(${spark},.95)`);
+  nuc.addColorStop(.5, `rgba(${tint},.5)`);
+  nuc.addColorStop(1, `rgba(${tint},0)`);
+  ctx.fillStyle = nuc;
+  ctx.beginPath(); ctx.arc(CX, CY, cr * .22 * beat, 0, TAU); ctx.fill();
+
+  // drei driftende Körnchen im Kern
+  ctx.fillStyle = `rgba(${spark},.7)`;
+  for (let k = 0; k < 3; k++){
+    const a = G.t * (.4 + k * .17) + k * TAU / 3;
+    const rr = cr * (.06 + .04 * Math.sin(G.t * .9 + k * 2));
+    ctx.beginPath();
+    ctx.arc(CX + Math.cos(a) * rr, CY + Math.sin(a) * rr, 1.1, 0, TAU);
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+
+  // Schild als dünne Membran, füllt sich im Kreis
+  const hpR = clamp(G.hp / shieldMax(), 0, 1);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(255,255,255,.07)';
+  ctx.beginPath(); ctx.arc(CX, CY, cr, 0, TAU); ctx.stroke();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = G.hitFlash > 0 ? 'rgba(255,90,110,.9)' : `rgba(${tint},.65)`;
+  ctx.setLineDash([3, 5]); ctx.lineDashOffset = -G.t * 8;
+  ctx.beginPath();
+  ctx.arc(CX, CY, cr, -Math.PI/2, -Math.PI/2 + TAU * hpR);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Mündungsblitze in Schussrichtung
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = `rgba(${spark},1)`; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  for (const f of G.flashes){
+    ctx.globalAlpha = f.life / .12;
+    ctx.beginPath();
+    ctx.moveTo(CX + Math.cos(f.a) * cr * .55, CY + Math.sin(f.a) * cr * .55);
+    ctx.lineTo(CX + Math.cos(f.a) * (cr + 9), CY + Math.sin(f.a) * (cr + 9));
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+function drawDrones(){
+  for (const d of G.drones){
+    ctx.save();
+    ctx.translate(d.x, d.y);
+    ctx.rotate(d.a + Math.PI / 2);
+    ctx.shadowColor = '#7ef0ff'; ctx.shadowBlur = 12;
+    ctx.fillStyle = '#d6f4ff';
+    ctx.beginPath();
+    ctx.moveTo(0, -9); ctx.lineTo(6, 6); ctx.lineTo(0, 3); ctx.lineTo(-6, 6);
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#4bb8ff';
+    ctx.beginPath(); ctx.arc(0, -1, 2, 0, TAU); ctx.fill();
+    if (d.flash > 0){
+      ctx.fillStyle = `rgba(255,243,196,${d.flash / .1})`;
+      ctx.beginPath(); ctx.arc(0, -11, 3, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+function draw(){
+  ctx.save();
+  if (G.shake > 0 && !reduceMotion) ctx.translate((Math.random()-.5)*G.shake, (Math.random()-.5)*G.shake);
+  ctx.drawImage(bg, 0, 0, W, H);
+
+  drawRange();
+  for (const e of G.enemies) drawEnemy(e);
+  drawEdgeMarks();
+
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = 'rgba(255,200,87,.5)'; ctx.lineWidth = 2;
+  ctx.fillStyle = '#fff3c4';
+  for (const b of G.bullets){
+    ctx.beginPath(); ctx.moveTo(b.x - b.vx*.022, b.y - b.vy*.022); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.beginPath(); ctx.arc(b.x, b.y, 3.2, 0, TAU); ctx.fill();
+  }
+  for (const p of G.parts){
+    ctx.globalAlpha = Math.max(0, p.life / p.life0);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+
+  drawDrones();
+  drawCore();
+
+  for (const r of G.ripples){
+    const k = 1 - r.life / .45;
+    ctx.strokeStyle = `rgba(201,191,255,${1-k})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 8 + k*30, 0, TAU); ctx.stroke();
+  }
+
+  ctx.textAlign = 'center';
+  for (const tx of G.texts){
+    ctx.globalAlpha = Math.min(1, tx.life / tx.life0 * 1.6);
+    ctx.font = `600 ${tx.size}px "Chakra Petch", system-ui, sans-serif`;
+    ctx.fillStyle = tx.color;
+    ctx.fillText(tx.txt, tx.x, tx.y);
+  }
+  ctx.globalAlpha = 1;
+
+  if (G.hitFlash > 0){
+    ctx.fillStyle = `rgba(255,90,110,${G.hitFlash * .18})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+  ctx.restore();
+}
+
+/* =========================================================
+   12. Seitenleiste: Upgrades und Erfolge
+   ========================================================= */
+const list = $('list');
+const upEls = {};
+for (const u of UPGRADES){
+  const b = document.createElement('button');
+  b.className = `up cat-${u.cat}`;
+  b.innerHTML =
+    `<span class="ic">${svgIcon(ICONS[u.id])}</span>` +
+    `<span class="up-row"><span class="up-name">${u.name}</span><span class="up-lvl"></span></span>` +
+    `<span class="up-val"></span><span class="up-cost"></span>`;
+  b.addEventListener('click', () => buy(u));
+  upEls[u.id] = { b, lvl: b.querySelector('.up-lvl'), val: b.querySelector('.up-val'), cost: b.querySelector('.up-cost') };
+}
+
+function renderList(){
+  list.innerHTML = '';
+  if (G.tab === 'ach'){
+    const wrap = document.createElement('div');
+    wrap.className = 'ach';
+    for (const a of ACHS){
+      const done = S.done.includes(a.id);
+      const bonus = a.dmg ? `+${Math.round(a.dmg*100)} % Schaden` : `+${Math.round(a.gold*100)} % Gold`;
+      const d = document.createElement('div');
+      d.className = 'ach-i' + (done ? ' done' : '');
+      d.innerHTML = `<span class="ach-d">${svgIcon(ICONS.check)}</span>` +
+        `<span class="ach-n">${a.name}</span>` +
+        `<span class="ach-b">${done ? bonus : a.hint}</span>`;
+      wrap.appendChild(d);
+    }
+    list.appendChild(wrap);
+    return;
+  }
+  if (G.tab === 'stat'){
+    list.appendChild(buildStats());
+    return;
+  }
+  if (G.tab === 'tal'){
+    const head = document.createElement('h3');
+    head.className = 'tal-head';
+    head.textContent = `${fmt(S.stars)} Sterne frei. Sterne gibt es nur über den Neustart unten: ab Welle `
+      + `${C.prestigeMinWave} kannst du freiwillig neu anfangen, gibst Gold, Upgrades und Wellen auf und bekommst `
+      + `dafür Sterne, je höher die erreichte Welle desto mehr (auf ${D().name} ${dec(D().stars)}×). `
+      + `Hier verteilte Talente bleiben dauerhaft, ebenso Kristalle und Erfolge.`;
+    list.appendChild(head);
+    for (const t of TALENTS) list.appendChild(talEls[t.id].b);
+    const rb = document.createElement('button');
+    rb.className = 'respec';
+    rb.textContent = 'Alle Sterne zurückholen';
+    rb.addEventListener('click', respec);
+    list.appendChild(rb);
+    renderTalents();
+    return;
+  }
+  if (G.tab === 'chal'){
+    list.appendChild(buildChallenges());
+    return;
+  }
+  if (G.tab === 'spec'){
+    const head = document.createElement('h3');
+    head.className = 'spec-head';
+    head.textContent = `${fmt(S.crystals)} Kristalle vorhanden. Gegner lassen selten einen fallen, Bosse immer. Käufe bleiben beim Neustart erhalten.`;
+    list.appendChild(head);
+    for (const x of SPECIALS) list.appendChild(specEls[x.id].b);
+    renderSpecials();
+    return;
+  }
+  for (const u of UPGRADES) if (u.cat === G.tab) list.appendChild(upEls[u.id].b);
+  renderUpgrades();
+}
+
+/* Zielpriorität */
+const aimRow = $('aimRow');
+for (const a of AIMS){
+  const b = document.createElement('button');
+  b.textContent = a.name;
+  b.title = a.hint;
+  b.addEventListener('click', () => {
+    S.aim = a.id;
+    renderAim(); save();
+    toast(`Ziel zuerst: ${a.hint}`);
+  });
+  aimRow.appendChild(b);
+}
+function renderAim(){
+  [...aimRow.children].forEach((b, i) => b.setAttribute('aria-pressed', String(AIMS[i].id === S.aim)));
+}
+addEventListener('keydown', ev => {
+  const i = '1234'.indexOf(ev.key);
+  if (i >= 0 && AIMS[i]){ S.aim = AIMS[i].id; renderAim(); save(); }
+});
+
+/* Sternen-Baum */
+const talCost = (t, l) => t.base + t.step * l;
+const talSpent = t => {
+  let sum = 0;
+  for (let l = 0; l < S.tal[t.id]; l++) sum += talCost(t, l);
+  return sum;
+};
+const talOpen = t => !t.req || S.tal[t.req[0]] >= t.req[1];
+
+const talEls = {};
+for (const t of TALENTS){
+  const b = document.createElement('button');
+  b.className = 'up cat-tal';
+  b.innerHTML =
+    `<span class="ic">${svgIcon(ICONS.crit)}</span>` +
+    `<span class="up-row"><span class="up-name">${t.name}</span><span class="up-lvl"></span></span>` +
+    `<span class="up-val"></span><span class="tal-cost"></span>`;
+  b.addEventListener('click', () => buyTalent(t));
+  talEls[t.id] = { b, lvl: b.querySelector('.up-lvl'), val: b.querySelector('.up-val'), cost: b.querySelector('.tal-cost') };
+}
+
+function buyTalent(t){
+  if (!talOpen(t)){
+    toast(`Dafür brauchst du ${TAL[t.req[0]].name} auf Stufe ${t.req[1]}`);
+    return;
+  }
+  const l = S.tal[t.id];
+  if (l >= t.max) return;
+  const price = talCost(t, l);
+  if (S.stars < price){ toast(`Dafür brauchst du ${price} Sterne`); return; }
+  const oldShield = shieldMax();
+  S.stars -= price;
+  S.tal[t.id] = l + 1;
+  G.hp += shieldMax() - oldShield;
+  const b = talEls[t.id].b;
+  b.classList.remove('bought'); void b.offsetWidth; b.classList.add('bought');
+  sfx('buy');
+  save(); renderUI(); renderList();
+}
+
+function respec(){
+  let back = 0;
+  for (const t of TALENTS) back += talSpent(t);
+  if (!back){ toast('Du hast noch keine Sterne verteilt'); return; }
+  if (!confirm(`${back} Sterne zurückholen und alle Talente zurücksetzen?`)) return;
+  S.stars += back;
+  for (const k in S.tal) S.tal[k] = 0;
+  G.hp = Math.min(G.hp, shieldMax());
+  toast(`${back} Sterne zurückgeholt`);
+  save(); renderUI(); renderList();
+}
+
+function renderTalents(){
+  for (const t of TALENTS){
+    const e = talEls[t.id], l = S.tal[t.id], maxed = l >= t.max, open = talOpen(t);
+    e.b.classList.toggle('maxed', maxed);
+    e.b.classList.toggle('locked-tal', !open);
+    e.lvl.textContent = `${l} / ${t.max}`;
+    e.val.textContent = open
+      ? (maxed ? t.info(l) : `${t.info(l)} → ${t.info(l + 1)}`)
+      : `gesperrt bis ${TAL[t.req[0]].name} Stufe ${t.req[1]}`;
+    if (maxed){
+      e.cost.textContent = 'Voll ausgebaut';
+      e.b.setAttribute('aria-disabled', 'true');
+    } else {
+      e.cost.textContent = `★ ${talCost(t, l)}`;
+      e.b.setAttribute('aria-disabled', String(!open || S.stars < talCost(t, l)));
+    }
+  }
+}
+
+/* Aufgaben */
+function buildChallenges(){
+  const wrap = document.createElement('div');
+  wrap.className = 'ach';
+  const head = document.createElement('div');
+  head.className = 'ch-head';
+  head.textContent = S.ch
+    ? 'Eine Aufgabe läuft. Du kannst sie jederzeit abbrechen, dann beginnt eine normale Runde.'
+    : 'Eine Aufgabe startet eine neue Runde mit Sonderregel. Gold und Upgrades fallen zurück auf Anfang, Sterne, Kristalle und Erfolge bleiben.';
+  wrap.appendChild(head);
+
+  for (const c of CHALLENGES){
+    const done = S.chDone.includes(c.id);
+    const active = S.ch === c.id;
+    const d = document.createElement('div');
+    d.className = 'ch-i' + (done ? ' done' : active ? ' active' : '');
+    const label = c.reward === 'dmg' ? 'Schaden' : c.reward === 'gold' ? 'Gold' : 'Kristallchance';
+    d.innerHTML =
+      `<div class="ch-top"><span class="ch-n">${c.name}</span>` +
+      `<span class="ch-r">+${Math.round(c.amount*100)} % ${label}</span></div>` +
+      `<div class="ch-d">${c.desc}</div>`;
+    if (done){
+      const st = document.createElement('div');
+      st.className = 'ch-state'; st.style.color = 'var(--acc)';
+      st.textContent = 'Geschafft';
+      d.appendChild(st);
+    } else if (active){
+      const st = document.createElement('div');
+      st.className = 'ch-state';
+      st.textContent = c.rule === 'timed'
+        ? `Läuft: Welle ${S.bestWave} von ${c.goal}, noch ${Math.max(0, Math.ceil(c.limit - S.chTime))} Sekunden`
+        : `Läuft: Welle ${S.bestWave} von ${c.goal}`;
+      d.appendChild(st);
+      const ab = document.createElement('button');
+      ab.className = 'ch-b'; ab.textContent = 'Abbrechen';
+      ab.addEventListener('click', () => { toast(`${c.name} abgebrochen`); endChallenge(false); });
+      d.appendChild(ab);
+    } else {
+      const bt = document.createElement('button');
+      bt.className = 'ch-b';
+      bt.textContent = S.ch ? 'Erst laufende Aufgabe beenden' : 'Starten';
+      if (S.ch) bt.setAttribute('aria-disabled', 'true');
+      else bt.addEventListener('click', () => startChallenge(c));
+      d.appendChild(bt);
+    }
+    wrap.appendChild(d);
+  }
+  return wrap;
+}
+
+const specEls = {};
+for (const x of SPECIALS){
+  const b = document.createElement('button');
+  b.className = 'up cat-spec';
+  b.innerHTML =
+    `<span class="ic">${svgIcon(ICONS[x.icon])}</span>` +
+    `<span class="up-row"><span class="up-name">${x.name}</span><span class="up-lvl"></span></span>` +
+    `<span class="up-val">${x.desc}</span><span class="sp-cost"></span>`;
+  b.addEventListener('click', () => buySpecial(x));
+  specEls[x.id] = { b, lvl: b.querySelector('.up-lvl'), val: b.querySelector('.up-val'), cost: b.querySelector('.sp-cost') };
+}
+
+function buySpecial(x){
+  const l = S.sp[x.id];
+  if (l >= x.max) return;
+  const price = x.costs[l];
+  if (S.crystals < price){ toast(`Dafür brauchst du ${price} Kristalle`); return; }
+  S.crystals -= price;
+  S.sp[x.id] = l + 1;
+  const b = specEls[x.id].b;
+  b.classList.remove('bought'); void b.offsetWidth; b.classList.add('bought');
+  sfx('buy');
+  toast(`${x.name} gekauft: ${x.info(S.sp[x.id])}`);
+  save(); renderUI(); renderList();
+}
+
+function renderSpecials(){
+  for (const x of SPECIALS){
+    const e = specEls[x.id], l = S.sp[x.id], maxed = l >= x.max;
+    e.b.classList.toggle('maxed', maxed);
+    e.lvl.textContent = `${l} / ${x.max}`;
+    e.val.textContent = `${x.desc} · ${x.info(l)}`;
+    if (maxed){
+      e.cost.textContent = 'Voll ausgebaut';
+      e.b.setAttribute('aria-disabled', 'true');
+    } else {
+      e.cost.textContent = `◈ ${x.costs[l]}`;
+      e.b.setAttribute('aria-disabled', String(S.crystals < x.costs[l]));
+    }
+  }
+}
+
+function timeText(sec){
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), sc = Math.floor(sec % 60);
+  if (h) return `${h} Std. ${m} Min.`;
+  if (m) return `${m} Min. ${sc} Sek.`;
+  return `${sc} Sek.`;
+}
+
+function buildStats(){
+  const st = S.st;
+  const quote = st.shots > 0 ? Math.round(st.hits / st.shots * 100) + ' %' : '–';
+  const proClick = st.clicks > 0 ? (st.clickKills / st.clicks * 100).toFixed(1).replace('.', ',') + ' %' : '–';
+  const proMin = st.time > 60 ? fmt(st.kills / (st.time / 60)) : '–';
+  const rows = [
+    ['Fortschritt', [
+      ['Beste Welle insgesamt', fmt(st.bestEver), true],
+      ['Beste Welle dieser Runde', fmt(S.bestWave)],
+      ['Spielzeit', timeText(st.time)],
+      ['Neustarts', fmt(st.prestiges)],
+      ['Sterne insgesamt verdient', fmt(st.starsTotal)],
+      ['Sterne frei / verteilt', `${fmt(S.stars)} / ${fmt(TALENTS.reduce((a, t) => a + talSpent(t), 0))}`],
+      ['Aufgaben geschafft', `${S.chDone.length} / ${CHALLENGES.length}`],
+      ['Erfolge', `${S.done.length} / ${ACHS.length}`],
+    ]],
+    ['Kampf', [
+      ['Zerstörte Gegner', fmt(st.kills), true],
+      ['Davon Bosse', fmt(st.bosses)],
+      ['Gegner pro Minute', proMin],
+      ['Abgefeuerte Schüsse', fmt(st.shots)],
+      ['Treffer', fmt(st.hits)],
+      ['Trefferquote', quote],
+      ['Ausgeteilter Schaden', fmt(st.dmg)],
+      ['Schildbrüche', fmt(st.breaks)],
+    ]],
+    ['Deine Eingaben', [
+      ['Klicks insgesamt', fmt(st.clicks), true],
+      ['Gegner per Klick erledigt', fmt(st.clickKills)],
+      ['Treffer pro Klick', proClick],
+      ['Wellen vorgezogen', fmt(st.rushed)],
+    ]],
+    ['Wirtschaft', [
+      ['Gold insgesamt gesammelt', fmt(st.gold), true],
+      ['Kristalle gefunden', fmt(st.crystals || 0)],
+      ['Gold im Depot verloren', fmt(st.lostGold || 0)],
+      ['Kristalle übrig', fmt(S.crystals)],
+      ['Gold jetzt', fmt(S.gold)],
+      ['Gold pro Sekunde', fmt(G.ips)],
+      ['Schaden pro Schuss', fmt(baseDamage())],
+      ['Schaden pro Klick', fmt(baseDamage() * val('click'))],
+    ]],
+  ];
+  const wrap = document.createElement('div');
+  wrap.className = 'stat';
+  for (const [title, items] of rows){
+    const h = document.createElement('h3');
+    h.textContent = title;
+    wrap.appendChild(h);
+    for (const [label, value, hi] of items){
+      const d = document.createElement('div');
+      d.className = 'stat-i' + (hi ? ' hi' : '');
+      const a = document.createElement('span'); a.textContent = label;
+      const b = document.createElement('b'); b.textContent = value;
+      d.appendChild(a); d.appendChild(b);
+      wrap.appendChild(d);
+    }
+  }
+  return wrap;
+}
+
+function plan(u){
+  const l = S.lv[u.id];
+  let count = 0, total = 0;
+  if (S.buyMode === 'max'){
+    while (l + count < u.max && count < 1000){
+      const c = cost(u, l + count);
+      if (total + c > S.gold) break;
+      total += c; count++;
+    }
+    if (count === 0){ count = 1; total = cost(u, l); }
+  } else {
+    count = Math.min(S.buyMode, u.max - l);
+    for (let k = 0; k < count; k++) total += cost(u, l + k);
+  }
+  return { count, total };
+}
+
+function buy(u, silent){
+  if (u.id === 'shield' && chRule('noShield')){
+    toast('In dieser Aufgabe ist das Schild-Upgrade gesperrt');
+    return;
+  }
+  if (S.lv[u.id] >= u.max) return;
+  const p = plan(u);
+  if (S.gold < p.total) return;
+  const oldShield = shieldMax();
+  S.gold -= p.total;
+  S.lv[u.id] += p.count;
+  if (u.id === 'shield') G.hp += shieldMax() - oldShield;
+  if (!silent){
+    const b = upEls[u.id].b;
+    b.classList.remove('bought'); void b.offsetWidth; b.classList.add('bought');
+    sfx('buy');
+  }
+  renderUpgrades();
+}
+
+function renderUpgrades(){
+  for (const u of UPGRADES){
+    if (u.cat !== G.tab) continue;
+    const e = upEls[u.id], l = S.lv[u.id], maxed = l >= u.max;
+    e.b.classList.toggle('maxed', maxed);
+    e.lvl.textContent = maxed ? `Stufe ${l} · voll` : `Stufe ${l}`;
+    if (maxed){
+      e.val.textContent = `${u.show(u.val(l))} ${u.unit}`;
+      e.cost.textContent = 'Voll ausgebaut';
+      e.b.setAttribute('aria-disabled', 'true');
+    } else {
+      const p = plan(u);
+      e.val.textContent = `${u.show(u.val(l))} → ${u.show(u.val(l + p.count))} ${u.unit}`;
+      e.cost.textContent = (p.count > 1 ? `${p.count} Stufen · ` : '') + fmt(p.total);
+      e.b.setAttribute('aria-disabled', String(S.gold < p.total));
+    }
+  }
+}
+
+document.querySelectorAll('.tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    G.tab = btn.dataset.tab;
+    document.querySelectorAll('.tabs button').forEach(x => x.setAttribute('aria-selected', String(x === btn)));
+    renderList();
+  });
+});
+document.querySelectorAll('.seg button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    S.buyMode = btn.dataset.n === 'max' ? 'max' : Number(btn.dataset.n);
+    document.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-pressed', String(x === btn)));
+    renderUpgrades();
+  });
+});
+
+$('autoBtn').addEventListener('click', () => {
+  S.autoBuy = !S.autoBuy;
+  $('autoBtn').setAttribute('aria-pressed', String(S.autoBuy));
+  toast(S.autoBuy ? 'Auto-Kauf an: kauft laufend das günstigste Upgrade' : 'Auto-Kauf aus');
+  save();
+});
+$('soundBtn').addEventListener('click', () => {
+  S.sound = !S.sound;
+  $('soundBtn').setAttribute('aria-pressed', String(S.sound));
+  if (S.sound){ audio(); sfx('buy'); }
+  save();
+});
+
+/* =========================================================
+   12b. Upgrade-Leiste ein- und ausblenden (pausiert das Spiel)
+   ========================================================= */
+function setPanel(open){
+  G.panel = open;
+  document.querySelector('aside').hidden = !open;
+  $('panelBtn').setAttribute('aria-expanded', String(open));
+  $('dim').hidden = !open;
+  if (open) renderList();          // Liste neu aufbauen, damit Werte aktuell sind
+  resize();                        // Spielfeld an die neue Breite anpassen
+  renderUI();
+}
+function toggleFullscreen(){
+  try {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen();
+  } catch (err){ toast('Vollbild geht in diesem Fenster nicht'); }
+}
+$('fsBtn').addEventListener('click', toggleFullscreen);
+$('panelBtn').addEventListener('click', () => setPanel(true));
+$('closeBtn').addEventListener('click', () => setPanel(false));
+
+/* =========================================================
+   12c. Nächste Welle vorziehen
+   ========================================================= */
+function waveCount(){
+  const normal = Math.max(3, Math.round((C.enemiesBase + S.wave * 0.6) * D().count));
+  // Boss-Wellen: der Boss plus eine halbe Eskorte, damit sie mitskalieren
+  return S.wave % C.bossEvery === 0 ? Math.max(6, Math.round(normal * 0.5)) : normal;
+}
+function rushWave(){
+  if (G.panel) return;                       // im Pausenmodus nichts auslösen
+  if (G.pause > 0){ G.pause = 0.01; return; }// Pause zwischen Wellen überspringen
+  S.wave++;
+  // Wichtig: vorgezogene Wellen zählen erst als erreicht, wenn sie geräumt sind.
+  const extra = waveCount();
+  G.toSpawn += extra;
+  G.waveTotal += extra;
+  G.queued++; S.st.rushed++;
+  // Vorgezogene Wellen trudeln nicht ein, sie kommen als Schwung:
+  // höchstens acht Sekunden für alles, was noch aussteht.
+  G.spawnLeft = Math.min(G.spawnLeft, 8);
+  G.spawnT = Math.min(G.spawnT, 0.12);
+  if (S.wave % C.bossEvery === 0){
+    G.bossPending = true;
+    const w = $('bossWarn');
+    w.classList.remove('show'); void w.offsetWidth; w.classList.add('show');
+    sfx('boss');
+  } else sfx('power');
+  toast(`Welle ${S.wave} vorgezogen`);
+  renderUI();
+}
+$('waveBtn').addEventListener('click', () => { audio(); rushWave(); });
+
+addEventListener('keydown', ev => {
+  const k = ev.key.toLowerCase();
+  if (k === 'u'){ setPanel(!G.panel); return; }
+  if (k === 'f'){ toggleFullscreen(); return; }
+  if (ev.key === 'Escape' && G.panel){ setPanel(false); return; }
+  if (k === 'w'){ audio(); rushWave(); }
+});
+
+/* =========================================================
+   13. Schwierigkeit
+   ========================================================= */
+function setDiff(id, restart){
+  if (chRule('brutal') && id !== 'brutal'){
+    toast('Die Aufgabe Feuerprobe verlangt Brutal');
+    return;
+  }
+  S.diff = id;
+  if (restart){
+    S.wave = 1; S.cleared = 0;
+    G.pendGold = 0; G.pendCry = 0;
+    G.enemies.length = 0; G.bullets.length = 0; G.toSpawn = 0; G.bossPending = false;
+    G.hp = shieldMax(); G.pause = 1;
+  }
+  $('intro').hidden = true;
+  save(); renderUI();
+}
+const diffCards = $('diffCards');
+for (const d of DIFFS){
+  const b = document.createElement('button');
+  b.innerHTML = '<strong></strong><small></small><em></em>';
+  b.querySelector('strong').textContent = d.name;
+  b.querySelector('small').textContent = d.desc;
+  b.querySelector('em').textContent = d.tag;
+  b.addEventListener('click', () => { audio(); setDiff(d.id, true); });
+  diffCards.appendChild(b);
+}
+$('diffBtn').addEventListener('click', () => { $('intro').hidden = false; });
+$('intro').addEventListener('click', ev => {
+  if (ev.target === $('intro') && S.wave > 1) $('intro').hidden = true;
+});
+
+/* =========================================================
+   14. Prestige
+   ========================================================= */
+let pConfirm = false, pTimer = 0;
+const prestigeGain = () => S.bestWave < C.prestigeMinWave ? 0
+  : Math.floor(Math.pow(S.bestWave - 10, 1.3) / 2 * D().stars);
+$('pBtn').addEventListener('click', () => {
+  const gain = prestigeGain();
+  if (gain <= 0) return;
+  if (!pConfirm){
+    pConfirm = true; renderUI();
+    clearTimeout(pTimer);
+    pTimer = setTimeout(() => { pConfirm = false; renderUI(); }, 3500);
+    return;
+  }
+  pConfirm = false; clearTimeout(pTimer);
+  S.stars += gain;
+  S.st.prestiges++; S.st.starsTotal += gain;
+  S.ch = null; S.chTime = 0;
+  resetRun(1 + tal('start') * 3);
+  toast(`Neustart: +${gain} Sterne zum Verteilen`);
+  sfx('power'); save(); renderUI();
+});
+
+/* =========================================================
+   15. Spielstand
+   ========================================================= */
+let storage = null;
+try {
+  localStorage.setItem(SAVE_KEY + '.test', '1');
+  localStorage.removeItem(SAVE_KEY + '.test');
+  storage = localStorage;
+} catch (err){ storage = null; }
+
+function save(){
+  if (!storage) return;
+  try {
+    storage.setItem(SAVE_KEY, JSON.stringify({
+      v: 2, gold: S.gold, wave: S.wave, bestWave: S.bestWave, stars: S.stars, diff: S.diff,
+      lv: S.lv, sp: S.sp, tal: S.tal, crystals: S.crystals, aim: S.aim, cleared: S.cleared,
+      chDone: S.chDone, ch: S.ch, chTime: S.chTime, done: S.done, st: S.st,
+      autoBuy: S.autoBuy, sound: S.sound, ips: G.ips, at: Date.now(),
+    }));
+  } catch (err){ storage = null; }
+}
+
+function load(){
+  if (!storage) return null;
+  let d;
+  try { d = JSON.parse(storage.getItem(SAVE_KEY) || 'null'); } catch (err){ return null; }
+  if (!d || (d.v !== 1 && d.v !== 2)) return null;
+
+  const num = (x, def) => (typeof x === 'number' && isFinite(x) && x >= 0 ? x : def);
+  S.gold = num(d.gold, 0);
+  S.wave = Math.max(1, Math.floor(num(d.wave, 1)));
+  S.bestWave = Math.max(S.wave, Math.floor(num(d.bestWave, 1)));
+  S.stars = Math.floor(num(d.stars, 0));
+  if (DIFFS.some(x => x.id === d.diff)) S.diff = d.diff;
+  for (const u of UPGRADES){
+    const l = Math.floor(num(d.lv && d.lv[u.id], 0));
+    S.lv[u.id] = Math.min(l, u.max === Infinity ? l : u.max);
+  }
+  S.crystals = Math.floor(num(d.crystals, 0));
+  for (const x of SPECIALS){
+    S.sp[x.id] = clamp(Math.floor(num(d.sp && d.sp[x.id], 0)), 0, x.max);
+  }
+  for (const t of TALENTS){
+    S.tal[t.id] = clamp(Math.floor(num(d.tal && d.tal[t.id], 0)), 0, t.max);
+  }
+  if (AIMS.some(a => a.id === d.aim)) S.aim = d.aim;
+  // Alte Spielstände kennen cleared nicht: konservativ aus der Welle ableiten
+  S.cleared = clamp(Math.floor(num(d.cleared, S.wave - 1)), 0, S.wave);
+  S.chDone = Array.isArray(d.chDone) ? d.chDone.filter(id => CH[id]) : [];
+  S.ch = CH[d.ch] && !S.chDone.includes(d.ch) ? d.ch : null;
+  S.chTime = num(d.chTime, 0);
+  S.done = Array.isArray(d.done) ? d.done.filter(id => ACHS.some(a => a.id === id)) : [];
+  const st = d.st || {};
+  for (const k of ['kills','bosses','clicks','clickKills','shots','hits','breaks',
+                   'rushed','crystals','prestiges','starsTotal','bestEver']){
+    S.st[k] = Math.floor(num(st[k], 0));
+  }
+  S.st.time = num(st.time, 0);
+  S.st.dmg = num(st.dmg, 0);
+  S.st.gold = num(st.gold, 0);
+  S.st.lostGold = num(st.lostGold, 0);
+  S.st.bestEver = Math.max(1, S.st.bestEver, S.bestWave);
+  S.autoBuy = !!d.autoBuy;
+  S.sound = !!d.sound;
+  G.ips = num(d.ips, 0);
+
+  const away = (Date.now() - num(d.at, Date.now())) / 1000;
+  if (away < C.offlineMinSec || G.ips <= 0) return { offline: null };
+  const sec = Math.min(away, C.offlineMaxHours * 3600);
+  const earned = G.ips * C.offlineRate * sec;
+  S.gold += earned;
+  return { offline: { sec: away, earned } };
+}
+
+function awayText(sec){
+  const h = Math.floor(sec / 3600), m = Math.round(sec % 3600 / 60);
+  if (h && m) return `${h} Std. ${m} Min.`;
+  if (h) return `${h} Std.`;
+  return `${m} Min.`;
+}
+/* Spielstand als Text mitnehmen: localStorage gilt nur pro Browser */
+function exportSave(){
+  save();
+  let raw;
+  try { raw = storage ? storage.getItem(SAVE_KEY) : null; } catch (err){ raw = null; }
+  if (!raw){ toast('Kein Spielstand zum Exportieren'); return; }
+  let code;
+  try { code = 'RW1' + btoa(unescape(encodeURIComponent(raw))); }
+  catch (err){ toast('Export hat nicht funktioniert'); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(code)
+      .then(() => toast('Spielstand in die Zwischenablage kopiert', 3500))
+      .catch(() => prompt('Diesen Text sichern:', code));
+  } else {
+    prompt('Diesen Text sichern:', code);
+  }
+}
+
+function importSave(){
+  const code = (prompt('Exportierten Spielstand hier einsetzen:') || '').trim();
+  if (!code) return;
+  if (!code.startsWith('RW1')){ toast('Das sieht nicht nach einem Ringwache-Spielstand aus'); return; }
+  let raw, data;
+  try {
+    raw = decodeURIComponent(escape(atob(code.slice(3))));
+    data = JSON.parse(raw);
+  } catch (err){ toast('Der Text ist beschädigt'); return; }
+  if (!data || (data.v !== 1 && data.v !== 2)){ toast('Unbekannte Spielstand-Version'); return; }
+  if (!confirm('Diesen Spielstand laden? Dein aktueller Fortschritt wird überschrieben.')) return;
+  try { storage.setItem(SAVE_KEY, raw); } catch (err){ toast('Speichern nicht möglich'); return; }
+  location.reload();
+}
+
+$('exportBtn').addEventListener('click', exportSave);
+$('importBtn').addEventListener('click', importSave);
+
+$('wipeBtn').addEventListener('click', () => {
+  if (!confirm('Spielstand wirklich löschen? Gold, Wellen, Upgrades, Erfolge und Sterne sind dann weg.')) return;
+  if (storage){ try { storage.removeItem(SAVE_KEY); } catch (err){} }
+  location.reload();
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+addEventListener('pagehide', save);
+
+/* =========================================================
+   16. Interface aktualisieren
+   ========================================================= */
+let toastTimer = 0;
+function toast(msg, ms = 2200){
+  const el = $('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+function renderUI(){
+  $('gold').textContent = fmt(S.gold);
+  $('ips').textContent = fmt(G.ips);
+  $('acc').textContent = G.shots > 20 ? Math.round(G.hits / G.shots * 100) + ' %' : '–';
+
+  // Schaden pro Schuss, pro Salve und pro Klick, Volltreffer als Durchschnitt
+  const shot = baseDamage(), critAvg = 1 + critChance() * 2;
+  $('dmgShot').textContent = fmt(shot);
+  $('dmgSalve').textContent = `${fmt(shot * multiCount())}${critChance() > 0 ? ' · ⌀ ' + fmt(shot * multiCount() * critAvg) : ''}`;
+  $('dmgClick').textContent = fmt(shot * val('click'));
+  $('wave').textContent = `Welle ${S.wave}`;
+  $('boss').hidden = S.wave % C.bossEvery !== 0;
+  const cq = $('chalTag');
+  if (S.ch && CH[S.ch]){
+    const c = CH[S.ch];
+    cq.hidden = false;
+    cq.textContent = c.rule === 'timed'
+      ? `${c.name} ${S.bestWave}/${c.goal} · ${Math.max(0, Math.ceil(c.limit - S.chTime))}s`
+      : `${c.name} ${S.bestWave}/${c.goal}`;
+  } else cq.hidden = true;
+  const q = $('queued');
+  q.hidden = G.queued <= 0;
+  q.textContent = `+${G.queued} ungesichert`;
+
+  const total = G.waveTotal || 1;
+  $('waveFill').style.width = clamp(G.waveKilled / total * 100, 0, 100) + '%';
+  $('waveLabel').textContent = G.toSpawn > 0
+    ? `${G.waveKilled} / ${total} besiegt · ${Math.ceil(G.spawnLeft)} s Anflug`
+    : `${G.waveKilled} / ${total} besiegt`;
+
+  $('rushHint').textContent = G.queued > 0
+    ? `geräumt bis Welle ${S.cleared} · Bruch wirft auf ${Math.max(1, Math.min(S.wave, Math.max(1, S.cleared)) - D().fallback)}`
+    : D().escrow ? 'tippen für nächste Welle · Beute erst nach der Welle'
+    : 'tippen für nächste Welle';
+  const maxHp = shieldMax();
+  $('hpFill').style.width = clamp(G.hp / maxHp * 100, 0, 100) + '%';
+  $('hpLabel').textContent = `Schild ${Math.ceil(Math.max(0, G.hp))} / ${maxHp}`;
+
+  $('stKills').textContent = fmt(S.st.kills);
+  $('stBoss').textContent = fmt(S.st.bosses);
+  $('stTime').textContent = timeText(S.st.time);
+
+  $('crystals').textContent = fmt(S.crystals);
+  const pe = $('pending');
+  if (G.pendGold > 0 || G.pendCry > 0){
+    pe.hidden = false;
+    pe.innerHTML = `Depot <b>${fmt(G.pendGold)}</b>${G.pendCry ? ` <b>+${G.pendCry}◈</b>` : ''}`;
+  } else pe.hidden = true;
+  $('diffLabel').textContent = D().name;
+  $('autoBtn').setAttribute('aria-pressed', String(S.autoBuy));
+  $('soundBtn').setAttribute('aria-pressed', String(S.sound));
+
+  if (G.tab === 'stat'){
+    if (G.panel) renderList();               // Werte aktuell halten
+  } else if (G.tab === 'tal'){
+    renderTalents();
+  } else if (G.tab === 'chal'){
+    if (G.panel && S.ch) renderList();
+  } else if (G.tab === 'spec'){
+    renderSpecials();
+  } else if (G.tab !== 'ach'){
+    renderUpgrades();
+  }
+
+  const gain = prestigeGain();
+  let spent = 0;
+  for (const t of TALENTS) spent += talSpent(t);
+  $('pTitle').textContent = `Sterne: ${fmt(S.stars)} frei, ${fmt(spent)} verteilt`;
+  $('pDesc').textContent = gain > 0
+    ? `Welle ${S.bestWave} bringt ${gain} Sterne. Gold und Upgrades gehen verloren.`
+    : `Ab Welle ${C.prestigeMinWave} gibt es Sterne. Details im Reiter Sterne.`;
+  const pBtn = $('pBtn');
+  if (gain > 0){
+    pBtn.textContent = pConfirm ? 'Sicher? Nochmal' : `Neustart · ★ ${gain}`;
+    pBtn.setAttribute('aria-disabled', 'false');
+  } else {
+    pBtn.textContent = `Welle ${C.prestigeMinWave}`;
+    pBtn.setAttribute('aria-disabled', 'true');
+  }
+
+  const si = $('saveInfo'), wb = $('wipeBtn');
+  if (storage){
+    si.textContent = `Gespeichert · offline ${fmt(G.ips * C.offlineRate)} Gold/s`;
+    wb.hidden = false;
+  } else {
+    si.textContent = 'Speichern hier nicht möglich';
+    wb.hidden = true;
+  }
+}
+
+/* =========================================================
+   17. Start
+   ========================================================= */
+const loaded = load();
+const offline = loaded && loaded.offline;
+if (!loaded) $('intro').hidden = false;      // erster Start: Schwierigkeit wählen
+G.hp = shieldMax();
+startWave();
+renderList();
+renderAim();
+setPanel(false);                             // eingeklappt starten, Spiel läuft
+renderUI();
+if (offline) toast(`${awayText(offline.sec)} weg: +${fmt(offline.earned)} Gold`, 5000);
+else if (loaded) toast('Willkommen zurück', 2500);
+else setTimeout(() => toast('Upgrades: Knopf oben rechts oder Taste U', 4000), 1200);
+
+let last = performance.now(), uiT = 0, saveT = 0;
+let errCount = 0;
+function frame(now){
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  // Ein Fehler in einem Frame darf die Schleife nicht dauerhaft anhalten.
+  try {
+    if (W > 0 && H > 0){ update(dt); draw(); }
+    uiT += dt;
+    if (uiT > 0.12){ uiT = 0; renderUI(); }
+    saveT += dt;
+    if (saveT > C.saveEvery){ saveT = 0; save(); }
+  } catch (err){
+    if (++errCount < 5) console.error('Ringwache:', err);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
