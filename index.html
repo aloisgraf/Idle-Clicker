@@ -595,7 +595,7 @@ const S = {
         starsTotal: 0, bestEver: 1 },
 };
 const G = {
-  enemies:[], bullets:[], parts:[], texts:[], ripples:[], flashes:[], waves:[],
+  enemies:[], bullets:[], parts:[], texts:[], ripples:[], flashes:[], waves:[], grid:new Map(),
   toSpawn:0, spawnT:0, spawnLeft:0, bossPending:false, pause:0, waveTotal:0, waveKilled:0,
   cd:0, hp:10, shake:0, hitFlash:0, spin:0, t:0,
   acc:0, accT:0, ips:0, shots:0, hits:0, drones:[],
@@ -881,26 +881,49 @@ function aimScore(e){
     default:        return -e.dist;
   }
 }
+// Räumliches Raster für die Zielsuche: vermeidet bei großen (z. B. vorgezogenen)
+// Wellen einen kompletten Scan aller Gegner bei jedem Schuss.
+const GRID_CELL = 120;
+function rebuildGrid(){
+  G.grid.clear();
+  for (const e of G.enemies){
+    if (e.dead) continue;
+    const k = (e.x / GRID_CELL | 0) + ',' + (e.y / GRID_CELL | 0);
+    let arr = G.grid.get(k);
+    if (!arr){ arr = []; G.grid.set(k, arr); }
+    arr.push(e);
+  }
+}
+function forEachNear(x, y, r, fn){
+  const gx0 = (x - r) / GRID_CELL | 0, gx1 = (x + r) / GRID_CELL | 0;
+  const gy0 = (y - r) / GRID_CELL | 0, gy1 = (y + r) / GRID_CELL | 0;
+  for (let gx = gx0; gx <= gx1; gx++){
+    for (let gy = gy0; gy <= gy1; gy++){
+      const arr = G.grid.get(gx + ',' + gy);
+      if (arr) for (const e of arr) fn(e);
+    }
+  }
+}
 function pickTarget(){
   const R = rangePx();
   let best = null, bs = -Infinity;
-  for (const e of G.enemies){
-    if (e.dead || e.dist > R + e.r || e.pending >= e.hp) continue;   // kein Überkill
+  forEachNear(CX, CY, R + 40, e => {          // +40: deckt auch große Gegner ab (Boss r:38)
+    if (e.dead || e.dist > R + e.r || e.pending >= e.hp) return;   // kein Überkill
     const sc = aimScore(e);
     if (sc > bs){ bs = sc; best = e; }
-  }
+  });
   return best;
 }
 function nearestEnemy(x, y, maxD, exclude){
   const R = rangePx() * 1.1;
   let best = null, bd = Infinity, bestFresh = false;
-  for (const e of G.enemies){
-    if (e.dead || exclude.includes(e) || e.dist > R + e.r) continue;
+  forEachNear(x, y, maxD, e => {
+    if (e.dead || exclude.includes(e) || e.dist > R + e.r) return;
     const dx = e.x - x, dy = e.y - y, d = dx*dx + dy*dy;
-    if (d > maxD * maxD) continue;
+    if (d > maxD * maxD) return;
     const fresh = e.pending < e.hp;
     if ((fresh && !bestFresh) || (fresh === bestFresh && d < bd)){ best = e; bd = d; bestFresh = fresh; }
-  }
+  });
   return best;
 }
 // Erwarteter Schaden an diesem Ziel, Panzerung eingerechnet
@@ -1055,7 +1078,7 @@ canvas.addEventListener('pointerdown', ev => {
    10. Spiellogik pro Frame
    ========================================================= */
 function update(dt){
-  if (G.panel) return;            // Upgrades offen: Spiel steht
+  if (G.panel || !$('intro').hidden) return;  // Upgrades offen oder Intro sichtbar: Spiel steht
   G.t += dt; S.st.time += dt;
   const maxHp = shieldMax();
   G.hp = Math.min(maxHp, G.hp + maxHp * shieldRegen() * dt);
@@ -1109,6 +1132,7 @@ function update(dt){
       damageBase(e.dmg * D().dmgTaken, e);
     }
   }
+  rebuildGrid();
 
   G.cd = Math.max(0, G.cd - dt);
   if (G.cd <= 0 && shoot(CX, CY, baseDamage(), multiCount(), chainCount(), true)) G.cd = 1 / fireRate();
@@ -1206,7 +1230,7 @@ function checkChallenge(dt){
     S.chTime += dt;
     if (S.chTime > c.limit && S.bestWave < c.goal){
       toast(`${c.name} nicht geschafft: Zeit abgelaufen`, 3500);
-      endChallenge(false);
+      endChallenge();
       return;
     }
   }
@@ -1215,7 +1239,7 @@ function checkChallenge(dt){
     const label = c.reward === 'dmg' ? 'Schaden' : c.reward === 'gold' ? 'Gold' : 'Kristallchance';
     toast(`${c.name} geschafft: dauerhaft +${Math.round(c.amount*100)} % ${label}`, 4000);
     sfx('power');
-    endChallenge(true);
+    endChallenge();
   }
 }
 
@@ -1925,7 +1949,7 @@ function buildChallenges(){
       d.appendChild(st);
       const ab = document.createElement('button');
       ab.className = 'ch-b'; ab.textContent = 'Abbrechen';
-      ab.addEventListener('click', () => { toast(`${c.name} abgebrochen`); endChallenge(false); });
+      ab.addEventListener('click', () => { toast(`${c.name} abgebrochen`); endChallenge(); });
       d.appendChild(ab);
     } else {
       const bt = document.createElement('button');
@@ -2271,6 +2295,10 @@ function save(){
       lv: S.lv, sp: S.sp, tal: S.tal, crystals: S.crystals, aim: S.aim, cleared: S.cleared,
       chDone: S.chDone, ch: S.ch, chTime: S.chTime, done: S.done, st: S.st,
       autoBuy: S.autoBuy, sound: S.sound, ips: G.ips, at: Date.now(),
+      // Angebrochene Welle (auch vorgezogene) sichern, damit ein Neuladen
+      // das Risiko des Vorziehens nicht kostenlos auflöst.
+      waveTotal: G.waveTotal, waveKilled: G.waveKilled, queued: G.queued,
+      bossPending: G.bossPending, pendGold: G.pendGold, pendCry: G.pendCry,
     }));
   } catch (err){ storage = null; }
 }
@@ -2319,12 +2347,32 @@ function load(){
   S.sound = !!d.sound;
   G.ips = num(d.ips, 0);
 
+  // Angebrochene Welle wiederherstellen: alles, was noch nicht besiegt war,
+  // muss erneut anfliegen, statt beim Neuladen einfach zu verschwinden.
+  // Sonst ließe sich das Risiko des Vorziehens (rushWave) durch einen
+  // simplen Reload umgehen.
+  const waveTotal = Math.floor(num(d.waveTotal, 0));
+  const waveKilled = Math.floor(num(d.waveKilled, 0));
+  let resumed = false;
+  if (waveTotal > waveKilled){
+    G.waveTotal = waveTotal;
+    G.waveKilled = waveKilled;
+    G.toSpawn = waveTotal - waveKilled;
+    G.queued = Math.floor(num(d.queued, 0));
+    G.bossPending = !!d.bossPending;
+    G.pendGold = num(d.pendGold, 0);
+    G.pendCry = Math.floor(num(d.pendCry, 0));
+    G.spawnLeft = D().waveTime;
+    G.spawnT = 0.3;
+    resumed = true;
+  }
+
   const away = (Date.now() - num(d.at, Date.now())) / 1000;
-  if (away < C.offlineMinSec || G.ips <= 0) return { offline: null };
+  if (away < C.offlineMinSec || G.ips <= 0) return { offline: null, resumed };
   const sec = Math.min(away, C.offlineMaxHours * 3600);
   const earned = G.ips * C.offlineRate * sec;
   S.gold += earned;
-  return { offline: { sec: away, earned } };
+  return { offline: { sec: away, earned }, resumed };
 }
 
 function awayText(sec){
@@ -2485,7 +2533,7 @@ const loaded = load();
 const offline = loaded && loaded.offline;
 if (!loaded) $('intro').hidden = false;      // erster Start: Schwierigkeit wählen
 G.hp = shieldMax();
-startWave();
+if (!loaded || !loaded.resumed) startWave();  // sonst: angebrochene Welle aus load() übernehmen
 renderList();
 renderAim();
 setPanel(false);                             // eingeklappt starten, Spiel läuft
