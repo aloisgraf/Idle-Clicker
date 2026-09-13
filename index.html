@@ -547,22 +547,22 @@ const C = {
   crystalBoss: 3,        // Kristalle pro besiegtem Boss
 };
 const SAVE_KEY = 'ringwache.v2';
-const VERSION = 8;   // von Hand bei jeder Änderung um 1 erhöhen
+const VERSION = 9;   // von Hand bei jeder Änderung um 1 erhöhen
 
 /* Schwierigkeitsstufen: Multiplikatoren auf das Grundspiel.
    fallback = Wellen zurück beim Schildbruch. */
 const DIFFS = [
   { id:'easy',   name:'Entspannt', hpGrowth:1.17, speed:.85,  count:.85, elite:.5, reward:.8,
-    dmgTaken:.5, regen:.030, fallback:2, stars:.6, waveTime:28, escrow:0,
+    dmgTaken:.5, fallback:2, stars:.6, waveTime:28, escrow:0,
     desc:'Wenige Gegner, viel Zeit, halber Schaden am Schild.', tag:'0,8× Gold' },
   { id:'normal', name:'Normal',    hpGrowth:1.19, speed:1.05, count:1.1, elite:1.1, reward:1,
-    dmgTaken:1.2, regen:.015, fallback:3, stars:1, waveTime:22, escrow:0,
+    dmgTaken:1.2, fallback:3, stars:1, waveTime:22, escrow:0,
     desc:'Fordernd, aber machbar. Eine Welle kommt in 22 Sekunden.', tag:'1× Gold' },
   { id:'hard',   name:'Hart',      hpGrowth:1.26, speed:1.3, count:2.2, elite:2.2, reward:2.1,
-    dmgTaken:2.4, regen:.006, fallback:5, stars:3.5, waveTime:18, escrow:.35,
+    dmgTaken:2.4, fallback:5, stars:3.5, waveTime:18, escrow:.35,
     desc:'Etwa zweieinhalbmal so viele Gegner in 18 Sekunden. 35 % der Beute erst nach geräumter Welle.', tag:'2,1× Gold, 3,5× Sterne' },
   { id:'brutal', name:'Brutal',    hpGrowth:1.3, speed:1.55, count:2.8, elite:3.4, reward:2.8,
-    dmgTaken:4.5, regen:.003, fallback:9, stars:9, waveTime:14, escrow:.5,
+    dmgTaken:4.5, fallback:9, stars:9, waveTime:14, escrow:.5,
     desc:'Dauerstrom aus allen Richtungen. Ein Durchbruch kostet neun Wellen und die halbe offene Beute.', tag:'2,8× Gold, 9× Sterne' },
 ];
 
@@ -694,7 +694,7 @@ const SPECIALS = [
     info:l => `+${l * 25} % Gold` },
   { id:'shield', name:'Notschild',     max:4, costs:[5, 11, 20, 34], icon:'shield',
     desc:'Der Schild heilt sich schneller von selbst',
-    info:l => `+${(l * .5).toFixed(1).replace('.', ',')} % Schild pro Sekunde` },
+    info:l => `+${dec2(l * .01)} Schildpunkte/s` },
 ];
 const SP = Object.fromEntries(SPECIALS.map(x => [x.id, x]));
 
@@ -765,16 +765,16 @@ const EXT = {
     cdBase:25, cdMin:6,
     pwBase:14, pwStep:.45, pwMaxLv:10, extraMax:3,
     tracks:['cd','pw','extra'] },
-  // Synapsenblitz reicht bis zum Erweiterungsring (per "reach"-Ausbau noch
-  // weiter steigerbar) und kann per "jump"-Ausbau von seinem Ziel aus zu
-  // weiteren Zielen überspringen (siehe boltRange/BOLT_JUMP_RADIUS in
-  // updateExtensions).
+  // Synapsenblitz reicht wie jede Erweiterung maximal bis zum
+  // Erweiterungsring und kann per "jump"-Ausbau von seinem Ziel aus zu
+  // weiteren, nahen Zielen überspringen (siehe boltRange/BOLT_JUMP_RADIUS
+  // in updateExtensions - auch Sprünge bleiben innerhalb des Rings).
   bolt: { id:'bolt', name:'Synapsenblitz', short:'Blitz', icon:'bolt',
     unlockDesc:'Ein Blitz springt in regelmäßigen Abständen zu einem Gegner bis zum Erweiterungsring.',
     cdBase:25, cdMin:6,
     pwBase:26, pwStep:.5, pwMaxLv:10, extraMax:3,
-    reachStep:20, reachMaxLv:8, jumpMax:3,
-    tracks:['pw','cd','extra','reach','jump'] },
+    jumpMax:3,
+    tracks:['pw','cd','extra','jump'] },
   // Synapsenrotation: je Ausbaustufe ein weiterer Feuerarm, gleichmäßig um
   // den Kern verteilt (2 Arme = 180° gegenüber, bis zu insgesamt 4 Arme).
   spiral: { id:'spiral', name:'Synapsenrotation', short:'Rotation', icon:'spiral',
@@ -818,7 +818,7 @@ const S = {
   lv: Object.fromEntries(UPGRADES.map(u => [u.id, 0])),
   sp: Object.fromEntries(SPECIALS.map(x => [x.id, 0])),
   tal: Object.fromEntries(TALENTS.map(t => [t.id, 0])),
-  ext: Object.fromEntries(Object.keys(EXT).map(id => [id, { lv:0, pw:0, cd:0, extra:0, reach:0, jump:0 }])),
+  ext: Object.fromEntries(Object.keys(EXT).map(id => [id, { lv:0, pw:0, cd:0, extra:0, jump:0 }])),
   ringLv: 0,
   chDone: [], ch: null, chTime: 0,
   done: [],
@@ -888,9 +888,12 @@ const baseDamage = () => val('dmg') * dmgMult();
 const clickDamage = () => val('click') * dmgMult();
 const fireRate = () => val('rate') * (1 + .04 * tal('rapid'));
 const shieldMax = () => Math.round(UP.shield.val(S.lv.shield) * (1 + .1 * tal('bulwark')) * (1 + prestigeDefBonus()) * (1 + rankDefBonus()));
-const shieldRegen = () => (D().regen + S.sp.shield * .005) * (1 + .2 * tal('bulwark'));
-// Feste Ringauffüllung in Punkten/Sekunde, zusätzlich zur prozentualen Regeneration
-const shieldRegenFlat = () => val('shieldRegen') * (1 + .2 * tal('bulwark'));
+// Ringauffüllung: feste Punkte/Sekunde, keine prozentuale Regeneration mehr
+// (die skalierte sonst mit steigendem Schild unkontrolliert mit hoch). Bei
+// Stufe 0 und ohne weitere Boni also exakt 0,01 Punkte/Sekunde. Notschild
+// legt ebenfalls feste Punkte/Sekunde drauf (nicht mehr prozentual), Bulwark
+// multipliziert die Summe.
+const shieldRegenFlat = () => (val('shieldRegen') + S.sp.shield * 0.01) * (1 + .2 * tal('bulwark'));
 const critChance = () => Math.min(.9, val('crit') + .02 * tal('crit'));
 const critDmgMult = () => val('critDmg');
 const chainCount = () => val('chain') + tal('chainT');
@@ -911,10 +914,11 @@ const extCdAt = (id, lv) => {
 };
 const extPower   = id => extPowerAt(id, S.ext[id].pw);
 const extCd      = id => extCdAt(id, S.ext[id].cd);
-// Reichweite des Synapsenblitzes: bis zum Erweiterungsring, plus Bonus aus
-// dem "reach"-Ausbau.
-const boltRange = () => extRingPx() + EXT.bolt.reachStep * S.ext.bolt.reach;
-// Suchradius für Kettensprünge: vom zuletzt getroffenen Ziel aus, nicht vom Kern.
+// Reichweite des Synapsenblitzes: wie jede Erweiterung maximal bis zum
+// Erweiterungsring, keine Ausnahme.
+const boltRange = () => extRingPx();
+// Suchradius für Kettensprünge: vom zuletzt getroffenen Ziel aus, nicht vom
+// Kern - ein Sprungziel muss aber trotzdem innerhalb des Erweiterungsrings liegen.
 const BOLT_JUMP_RADIUS = 200;
 function shuffleInPlace(arr){
   for (let i = arr.length - 1; i > 0; i--){
@@ -1409,7 +1413,8 @@ function updateExtensions(dt){
         let from = t0;
         for (let j = 0; j < S.ext.bolt.jump; j++){
           const nxt = nearTarget(from.x, from.y, BOLT_JUMP_RADIUS, hit);
-          if (!nxt) break;
+          // Auch ein Sprungziel darf nie über den Erweiterungsring hinausliegen.
+          if (!nxt || nxt.dist > BR + nxt.r) break;
           G.bolts.push({ path: lightningPath(from.x, from.y, nxt.x, nxt.y), life:.3, life0:.3 });
           hitEnemy(nxt, extPower('bolt'), false);
           hit.push(nxt);
@@ -1630,7 +1635,7 @@ function update(dt){
   G.t += dt; S.st.time += dt;
   const maxHp = shieldMax();
   const hpBefore = G.hp;
-  G.hp = Math.min(maxHp, G.hp + (maxHp * shieldRegen() + shieldRegenFlat()) * dt);
+  G.hp = Math.min(maxHp, G.hp + shieldRegenFlat() * dt);
   if (G.hp >= maxHp && hpBefore < maxHp) logHistory('Ringgesundheit wieder voll hergestellt', 'win');
   G.spin += dt * (0.8 + fireRate() * 0.5);
   updateCore(dt);
@@ -1823,7 +1828,7 @@ function resetRun(startWaveNum){
   S.bestWave = S.wave;
   S.cleared = S.wave - 1;
   for (const k in S.lv) S.lv[k] = 0;
-  for (const id in S.ext) S.ext[id] = { lv:0, pw:0, cd:0, extra:0, reach:0, jump:0 };
+  for (const id in S.ext) S.ext[id] = { lv:0, pw:0, cd:0, extra:0, jump:0 };
   S.ringLv = 0;
   G.goldRain = null;
   G.shocks.length = 0; G.bolts.length = 0; G.spiralShots.length = 0; G.beams.length = 0; G.droneShots.length = 0;
@@ -3011,7 +3016,7 @@ function renderExtBar(){
     el.p.textContent = e.pwBase !== undefined ? fmt(extPower(id)) + ' dmg' : 'Sofort-Kill';
     el.s.textContent = ready ? (e.manual ? 'klicken' : 'bereit') : dec(remain) + 's';
     el.cd.style.height = (total > 0 ? remain / total * 100 : 0) + '%';
-    el.k.textContent = 'L' + (1 + s.pw + s.cd + s.extra + s.reach + s.jump);
+    el.k.textContent = 'L' + (1 + s.pw + s.cd + s.extra + s.jump);
   }
 }
 
@@ -3060,7 +3065,6 @@ function extTrackText(id, kind, step){
       : id === 'spiral' ? 'Feuerarme' : 'gleichzeitige Richtungen';
     return `+${step} ${label}: ${1 + s.extra} → ${1 + step + s.extra}`;
   }
-  if (kind === 'reach') return `Reichweite über den Erweiterungsring hinaus: +${Math.round(e.reachStep * s.reach)}px → +${Math.round(e.reachStep * (s.reach + step))}px`;
   if (kind === 'jump') return `Kettensprünge: ${s.jump} → ${s.jump + step}`;
   return '';
 }
@@ -3086,7 +3090,6 @@ function extPool(){
         if (id === 'shock'){ if (Math.random() < 0.1) pool.push({ ext:id, kind:'extra', tier: rollCardTier() }); }
         else pool.push({ ext:id, kind:'extra', tier: rollCardTier() });
       }
-      else if (track === 'reach' && s.reach < (e.reachMaxLv || 0)) pool.push({ ext:id, kind:'reach', tier: rollCardTier() });
       else if (track === 'jump' && s.jump < (e.jumpMax || 0)) pool.push({ ext:id, kind:'jump', tier: rollCardTier() });
     }
   }
@@ -3181,7 +3184,6 @@ function pickExtCard(card){
   else if (card.kind === 'pw'){ s.pw = Math.min(e.pwMaxLv, s.pw + step); msg = `${e.name}: Stärke erhöht`; }
   else if (card.kind === 'cd'){ s.cd = Math.min(e.cdMaxLv, s.cd + step); msg = `${e.name}: ${e.rateBased ? 'Schussrate erhöht' : 'Aufladedauer verkürzt'}`; }
   else if (card.kind === 'extra'){ s.extra = Math.min(e.extraMax || 0, s.extra + step); msg = `${e.name}: +${step} gleichzeitig`; }
-  else if (card.kind === 'reach'){ s.reach = Math.min(e.reachMaxLv || 0, s.reach + step); msg = `${e.name}: Reichweite erhöht`; }
   else if (card.kind === 'jump'){ s.jump = Math.min(e.jumpMax || 0, s.jump + step); msg = `${e.name}: +${step} Kettensprünge`; }
   toast(msg);
   logHistory(msg, 'ext');
@@ -3329,7 +3331,6 @@ function load(){
       pw: clamp(Math.floor(num(x.pw, 0)), 0, e.pwMaxLv || 0),
       cd: clamp(Math.floor(num(x.cd, 0)), 0, e.cdMaxLv),
       extra: clamp(Math.floor(num(x.extra, 0)), 0, e.extraMax || 0),
-      reach: clamp(Math.floor(num(x.reach, 0)), 0, e.reachMaxLv || 0),
       jump: clamp(Math.floor(num(x.jump, 0)), 0, e.jumpMax || 0),
     };
   }
