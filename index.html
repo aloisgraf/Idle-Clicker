@@ -233,6 +233,13 @@ aside{position:fixed;left:0;right:0;bottom:0;z-index:7;width:100%;max-width:980p
 .ach-b{color:var(--muted);font-size:.82rem}
 .ach-i.done .ach-b{color:var(--acc)}
 
+.beast-grid{display:grid;gap:7px;grid-column:1/-1;grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+.beast-i{display:grid;grid-template-columns:30px 1fr;gap:2px 11px;align-items:center;padding:9px 11px;border-radius:11px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.beast-d{grid-row:span 2;width:24px;height:24px;margin:0 auto}
+.beast-n{font-weight:600;font-size:.94rem}
+.beast-b{color:var(--muted);font-size:.78rem;line-height:1.35}
+.beast-b i{font-style:normal;opacity:.75}
+
 .foot{border-top:1px solid var(--line);padding:9px 14px 10px;background:var(--panel-2);position:sticky;bottom:0;z-index:2}
 .foot-row{display:flex;align-items:center;gap:12px}
 .foot-txt{min-width:0}
@@ -316,6 +323,7 @@ aside{position:fixed;left:0;right:0;bottom:0;z-index:7;width:100%;max-width:980p
               <span class="gold-val" id="gold">0</span>
             </div>
             <div class="sub">
+              <span>Rang <b id="rank">1</b></span>
               <span><b id="ips">0</b> Gold/s</span>
               <span>Treffer <b id="acc">–</b></span>
               <span class="cry">◈ <b id="crystals">0</b></span>
@@ -428,6 +436,7 @@ aside{position:fixed;left:0;right:0;bottom:0;z-index:7;width:100%;max-width:980p
       <button role="tab" data-tab="chal" aria-selected="false">Aufgaben</button>
       <button role="tab" data-tab="ach" aria-selected="false">Erfolge</button>
       <button role="tab" data-tab="stat" aria-selected="false">Statistik</button>
+      <button role="tab" data-tab="bestiary" aria-selected="false">Gegner</button>
     </div>
 
     <div class="list" id="list"></div>
@@ -496,23 +505,44 @@ const DIFFS = [
     desc:'Dauerstrom aus allen Richtungen. Ein Durchbruch kostet neun Wellen und die halbe offene Beute.', tag:'2,8× Gold, 9× Sterne' },
 ];
 
-/* Gegnertypen. hp/speed/reward sind Multiplikatoren, dmg = Schildschaden. */
+/* Gegnertypen. hp/speed/reward sind Multiplikatoren, dmg = Schildschaden.
+   name/desc dienen nur der Übersicht im Menü (Reiter "Gegner"). */
 const TYPES = {
-  normal:   { r:14, hp:1,   speed:1,    reward:1,   dmg:1, color:'#ff5a6e', shape:'tri'   },
-  fast:     { r:10, hp:.5,  speed:1.85, reward:.8,  dmg:1, color:'#ff9f43', shape:'dart'  },
-  tank:     { r:20, hp:3.5, speed:.6,   reward:2.5, dmg:2, color:'#e85d9a', shape:'hex'   },
-  splitter: { r:17, hp:1.8, speed:.8,   reward:1.5, dmg:1, color:'#5ce1a0', shape:'blob'  },
-  shard:    { r:9,  hp:.35, speed:1.5,  reward:.5,  dmg:1, color:'#5ce1a0', shape:'blob'  },
-  ghost:    { r:13, hp:.8,  speed:1.1,  reward:1.8, dmg:1, color:'#b58cff', shape:'tri'   },
+  normal:   { r:14, hp:1,   speed:1,    reward:1,   dmg:1, color:'#ff5a6e', shape:'tri',
+    name:'Grundform', desc:'Kein Sondertrick, einfach nur da.' },
+  fast:     { r:10, hp:.5,  speed:1.85, reward:.8,  dmg:1, color:'#ff9f43', shape:'dart',
+    name:'Flitzer', desc:'Sehr schnell, aber wenig Leben.' },
+  tank:     { r:20, hp:3.5, speed:.6,   reward:2.5, dmg:2, color:'#e85d9a', shape:'hex',
+    name:'Brecher', desc:'Viel Leben, dafür langsam.' },
+  splitter: { r:17, hp:1.8, speed:.8,   reward:1.5, dmg:1, color:'#5ce1a0', shape:'blob',
+    name:'Spalter', desc:'Zerfällt beim Tod in zwei Splitter.' },
+  shard:    { r:9,  hp:.35, speed:1.5,  reward:.5,  dmg:1, color:'#5ce1a0', shape:'blob',
+    name:'Splitter', desc:'Bruchstück eines Spalters.' },
+  ghost:    { r:13, hp:.8,  speed:1.1,  reward:1.8, dmg:1, color:'#b58cff', shape:'tri',
+    name:'Geist', desc:'Schwankt stark und bewegt sich unberechenbar.' },
   // Panzerung: schluckt 55 % jedes Treffers, Volltreffer lohnen sich hier
-  armor:    { r:18, hp:2.2, speed:.7,   reward:2.4, dmg:2, color:'#7fb3ff', shape:'shell', armor:.55 },
+  armor:    { r:18, hp:2.2, speed:.7,   reward:2.4, dmg:2, color:'#7fb3ff', shape:'shell', armor:.55,
+    name:'Gepanzert', desc:'Schluckt einen Teil jedes Treffers. Volltreffer lohnen sich hier besonders.' },
   // Heiler: heilt alle Gegner in der Nähe, zuerst ausschalten
-  healer:   { r:15, hp:1.6, speed:.65,  reward:2.6, dmg:1, color:'#6ee7a8', shape:'cross', heal:.05, healR:150 },
+  healer:   { r:15, hp:1.6, speed:.65,  reward:2.6, dmg:1, color:'#6ee7a8', shape:'cross', heal:.05, healR:150,
+    name:'Heiler', desc:'Heilt regelmäßig alle Gegner in seiner Nähe. Zuerst ausschalten.' },
   // Regenerator: heilt sich selbst, wenn er zwei Sekunden nicht getroffen wurde
-  regen:    { r:16, hp:1.5, speed:.85,  reward:2,   dmg:1, color:'#ffd166', shape:'hex',   regen:.12 },
+  regen:    { r:16, hp:1.5, speed:.85,  reward:2,   dmg:1, color:'#ffd166', shape:'hex',   regen:.12,
+    name:'Regenerierer', desc:'Heilt sich selbst, sobald er zwei Sekunden nicht getroffen wurde.' },
   // Mücken kommen immer im Schwarm zu fünf
-  gnat:     { r:7,  hp:.22, speed:2.15, reward:.35, dmg:1, color:'#ffb84d', shape:'dart'  },
-  boss:     { r:38, hp:14,  speed:.45,  reward:15,  dmg:5, color:'#ff3864', shape:'star'  },
+  gnat:     { r:7,  hp:.22, speed:2.15, reward:.35, dmg:1, color:'#ffb84d', shape:'dart',
+    name:'Mücke', desc:'Kommt immer im Schwarm zu fünft.' },
+  // Berserker: wird schneller, je weniger Leben ihm bleibt
+  berserker:{ r:16, hp:2.4, speed:.55,  reward:2.8, dmg:2, color:'#ff4d6d', shape:'hex',   enrage:1.8,
+    name:'Berserker', desc:'Wird spürbar schneller, je weniger Leben ihm bleibt.' },
+  // Phantom: wechselt zwischen sichtbar/angreifbar und unsichtbar/unangreifbar
+  phantom:  { r:14, hp:1.3, speed:1.2,  reward:2.2, dmg:1, color:'#c9a6ff', shape:'tri',   cloak:true,
+    name:'Phantom', desc:'Wird abwechselnd unsichtbar und ist dann von nichts zu treffen.' },
+  // Brutmutter: spuckt regelmäßig Mücken aus, solange sie lebt
+  brood:    { r:19, hp:2.8, speed:.5,   reward:3,   dmg:2, color:'#ff8a3d', shape:'hex',   spawnRate:2.2,
+    name:'Brutmutter', desc:'Spuckt in Abständen eine Mücke aus, solange sie am Leben ist.' },
+  boss:     { r:38, hp:14,  speed:.45,  reward:15,  dmg:5, color:'#ff3864', shape:'star',
+    name:'Boss', desc:'Erscheint jede 10. Welle, deutlich stärker als alles andere.' },
 };
 // Welcher Typ ab welcher Welle auftaucht. w = ab Welle, p = Grundgewicht,
 // elite = zählt als starker Typ und wird auf höheren Stufen häufiger.
@@ -526,6 +556,9 @@ const SPAWN_TABLE = [
   { kind:'ghost',    w:12, p:3,  elite:true },
   { kind:'armor',    w:14, p:3,  elite:true },
   { kind:'healer',   w:16, p:2,  elite:true },
+  { kind:'berserker',w:18, p:3,  elite:true },
+  { kind:'phantom',  w:20, p:2,  elite:true },
+  { kind:'brood',    w:22, p:2,  elite:true },
 ];
 
 const ICONS = {
@@ -565,7 +598,7 @@ const UPGRADES = [
     val:l => 0.05 * l,
     show:v => Math.round(v*100) + ' %', unit:'für 3× Schaden' },
   { id:'range',  cat:'def', name:'Reichweite',    base:40,  grow:1.55, max:12,
-    val:l => 0.24 + 0.022*l,
+    val:l => 0.18 + 0.022*l,
     show:v => Math.round(v * minDim()), unit:'px Radius' },
   { id:'shield', cat:'def', name:'Schild',        base:45,  grow:1.35, max:Infinity,
     val:l => 10 + 4*l,
@@ -660,8 +693,8 @@ const EXT = {
   shock: { id:'shock', name:'Schockwelle', short:'Schock', icon:'shock',
     unlockDesc:'Ein Ring bricht regelmäßig vom Kern bis zum Rand deiner Reichweite und beschädigt jeden Angreifer, den er streift.',
     cdBase:25, cdMin:6,
-    pwBase:14, pwStep:.45, pwMaxLv:10,
-    tracks:['cd','pw'] },
+    pwBase:14, pwStep:.45, pwMaxLv:10, extraMax:3,
+    tracks:['cd','pw','extra'] },
   bolt: { id:'bolt', name:'Synapsenblitz', short:'Blitz', icon:'bolt',
     unlockDesc:'Ein Blitz springt in regelmäßigen Abständen zu einem Gegner in Reichweite.',
     cdBase:25, cdMin:6,
@@ -690,7 +723,7 @@ for (const id in EXT) EXT[id].cdMaxLv = Math.round((EXT[id].cdBase - EXT[id].cdM
    ========================================================= */
 const S = {
   gold: 0, wave: 1, bestWave: 1, stars: 0, buyMode: 1, diff: 'normal',
-  autoBuy: false, sound: false,
+  autoBuy: false, sound: false, rank: 1, rankPts: 0,
   crystals: 0, aim: 'near', cleared: 0,   // cleared = höchste vollständig geräumte Welle
   lv: Object.fromEntries(UPGRADES.map(u => [u.id, 0])),
   sp: Object.fromEntries(SPECIALS.map(x => [x.id, 0])),
@@ -937,6 +970,9 @@ function spawnEnemy(kind, atX, atY, countIt){
     counted: atX === undefined || countIt === true,
     armor: T.armor || 0, heal: T.heal || 0, healR: T.healR || 0, regenRate: T.regen || 0,
     healT: 0, lastHit: -99, healed: 0,
+    enrage: T.enrage || 0,
+    cloak: !!T.cloak, cloaked:false, cloakT: T.cloak ? 1.8 : 0,
+    spawnRate: T.spawnRate || 0, spawnT: T.spawnRate || 0,
   });
 }
 function payout(){
@@ -979,6 +1015,9 @@ function damageBase(amount, e){
     logHistory(`Welle ${S.wave} verloren`, 'loss');
     if (lostGold || lostCry) logHistory(`${fmt(lostGold)} Gold${lostCry ? ` und ${lostCry} Kristalle` : ''} verloren`, 'loss');
     logHistory(`Zurückgefallen auf Welle ${back}`, 'loss');
+    const oldRank = S.rank;
+    S.rank = Math.max(1, S.rank - RANK_LOSS);
+    if (S.rank < oldRank) logHistory(`${oldRank - S.rank} Rang${oldRank - S.rank > 1 ? 'e' : ''} verloren`, 'loss');
     S.wave = back;
     S.cleared = Math.max(0, back - 1);
     G.enemies.length = 0; G.bullets.length = 0; G.toSpawn = 0; G.bossPending = false;
@@ -1047,7 +1086,7 @@ function pickTarget(){
   const R = rangePx();
   let best = null, bs = -Infinity;
   forEachNear(CX, CY, R + 40, e => {          // +40: deckt auch große Gegner ab (Boss r:38)
-    if (e.dead || e.dist > R + e.r || e.pending >= e.hp) return;   // kein Überkill
+    if (e.dead || e.cloaked || e.dist > R + e.r || e.pending >= e.hp) return;   // kein Überkill
     const sc = aimScore(e);
     if (sc > bs){ bs = sc; best = e; }
   });
@@ -1057,7 +1096,7 @@ function nearestEnemy(x, y, maxD, exclude){
   const R = rangePx() * 1.1;
   let best = null, bd = Infinity, bestFresh = false;
   forEachNear(x, y, maxD, e => {
-    if (e.dead || exclude.includes(e) || e.dist > R + e.r) return;
+    if (e.dead || e.cloaked || exclude.includes(e) || e.dist > R + e.r) return;
     const dx = e.x - x, dy = e.y - y, d = dx*dx + dy*dy;
     if (d > maxD * maxD) return;
     const fresh = e.pending < e.hp;
@@ -1138,20 +1177,24 @@ function lightningPath(x1, y1, x2, y2){
 /* Erweiterungen: unabhängige Zusatzangriffe, die nach jeder Welle
    freigeschaltet oder ausgebaut werden können (siehe offerExtensionPick). */
 function updateExtensions(dt){
-  // Schockwelle: Ring läuft vom Kern bis zum Rand der Reichweite
+  // Schockwelle: 1+extra Ringe hintereinander, jeder läuft vom Kern bis zum Rand der Reichweite
   if (extOwned('shock')){
     G.ext.shock.cd -= dt;
     if (G.ext.shock.cd <= 0){
       G.ext.shock.cd = extCd('shock');
-      G.shocks.push({ r: C.coreRadius, hit: new Set() });
+      const n = 1 + S.ext.shock.extra;
+      for (let k = 0; k < n; k++){
+        G.shocks.push({ r: C.coreRadius, hit: new Set(), delay: k * 0.22 });
+      }
       S.st.abilities++;
     }
   }
   for (let i = G.shocks.length - 1; i >= 0; i--){
     const s = G.shocks[i];
+    if (s.delay > 0){ s.delay -= dt; continue; }   // wartet, bis der vorige Ring dran war
     s.r += rangePx() / 0.6 * dt;         // durchquert die Reichweite in 0,6s
     for (const e of G.enemies){
-      if (e.dead || s.hit.has(e) || Math.abs(e.dist - s.r) > 16) continue;
+      if (e.dead || e.cloaked || s.hit.has(e) || Math.abs(e.dist - s.r) > 16) continue;
       s.hit.add(e);
       hitEnemy(e, extPower('shock'), false);
     }
@@ -1165,7 +1208,7 @@ function updateExtensions(dt){
       G.ext.bolt.cd = extCd('bolt');
       const R = rangePx();
       const targets = [];
-      forEachNear(CX, CY, R + 40, e => { if (!e.dead && e.dist <= R + e.r) targets.push(e); });
+      forEachNear(CX, CY, R + 40, e => { if (!e.dead && !e.cloaked && e.dist <= R + e.r) targets.push(e); });
       shuffleInPlace(targets);
       const n = 1 + S.ext.bolt.extra;
       for (let k = 0; k < Math.min(n, targets.length); k++){
@@ -1183,7 +1226,7 @@ function updateExtensions(dt){
     G.ext.spiral.cd -= dt;
     if (G.ext.spiral.cd <= 0){
       G.ext.spiral.cd = extCd('spiral');
-      G.ext.spiral.angle += 0.62;        // ~35°: ergibt über die Zeit eine gleichmäßige Spirale
+      G.ext.spiral.angle += 0.16;        // enger Dreh: dicht gewundene Spirale statt weiter Lücken
       const a = G.ext.spiral.angle, sp = 240;
       G.spiralShots.push({ x:CX, y:CY, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:2.4 });
       S.st.abilities++;
@@ -1194,7 +1237,7 @@ function updateExtensions(dt){
     p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
     let gone = p.life <= 0 || p.x < -40 || p.x > W + 40 || p.y < -40 || p.y > H + 40;
     if (!gone) for (const e of G.enemies){
-      if (e.dead) continue;
+      if (e.dead || e.cloaked) continue;
       const dx = e.x - p.x, dy = e.y - p.y, rr = e.r + 5;
       if (dx*dx + dy*dy < rr*rr){ hitEnemy(e, extPower('spiral'), false); gone = true; break; }
     }
@@ -1213,7 +1256,7 @@ function updateExtensions(dt){
         const a = dirs[k], ca = Math.cos(a), sa = Math.sin(a);
         G.beams.push({ a, life:.3, life0:.3 });
         for (const e of G.enemies){
-          if (e.dead) continue;
+          if (e.dead || e.cloaked) continue;
           const relx = e.x - CX, rely = e.y - CY;
           const along = relx*ca + rely*sa;
           if (along < 0 || along > R) continue;             // nur in Schussrichtung, bis zur Reichweite
@@ -1243,6 +1286,18 @@ function hitEnemy(e, dmg, fromClick){
   if (e.hp <= 0 && !e.dead){ e.dead = true; kill(e); }
   else if (!fromClick) sfx('hit');
 }
+/* Rang: reine Bestenlisten-Kennzahl ohne Spielwirkung. 50 Ränge, 100
+   Punkte je Abschuss-Rang, ein Schildbruch kostet 10 Ränge. */
+const RANK_MAX = 50, RANK_PTS_PER = 100, RANK_LOSS = 10;
+function gainRankPoints(n){
+  if (S.rank >= RANK_MAX) return;
+  S.rankPts += n;
+  while (S.rankPts >= RANK_PTS_PER && S.rank < RANK_MAX){
+    S.rankPts -= RANK_PTS_PER;
+    S.rank++;
+  }
+  if (S.rank >= RANK_MAX){ S.rank = RANK_MAX; S.rankPts = 0; }
+}
 function kill(e){
   const r = C.reward * Math.pow(C.rewardGrowth, S.wave - 1) * e.reward * D().reward
           * val('income') * goldMult() * (1);
@@ -1255,6 +1310,7 @@ function kill(e){
   S.gold += now; S.st.gold += now;
   G.acc += r;
   S.st.kills++;
+  gainRankPoints(1);
 
   // Kristalle: selten bei normalen Gegnern, sicher bei Bossen
   let cr = 0;
@@ -1306,7 +1362,7 @@ canvas.addEventListener('pointerdown', ev => {
   S.st.clicks++;
   let best = null, bd = Infinity;
   for (const e of G.enemies){
-    if (e.dead) continue;
+    if (e.dead || e.cloaked) continue;
     const d = Math.hypot(e.x - x, e.y - y);
     if (d < e.r + 24 && d < bd){ bd = d; best = e; }
   }
@@ -1368,7 +1424,19 @@ function update(dt){
         }
       }
     }
-    e.bx += e.vx * dt; e.by += e.vy * dt;
+    // Brutmutter spuckt regelmäßig eine Mücke aus, solange sie lebt
+    if (e.spawnRate){
+      e.spawnT -= dt;
+      if (e.spawnT <= 0){ e.spawnT = e.spawnRate; spawnEnemy('gnat', e.x, e.y); }
+    }
+    // Phantom wechselt zwischen sichtbar/angreifbar und unsichtbar/unangreifbar
+    if (e.cloak){
+      e.cloakT -= dt;
+      if (e.cloakT <= 0){ e.cloaked = !e.cloaked; e.cloakT = e.cloaked ? 1.2 : 1.8; }
+    }
+    // Berserker wird schneller, je weniger Leben ihm bleibt
+    const mv = e.enrage ? 1 + e.enrage * (1 - e.hp / e.maxHp) : 1;
+    e.bx += e.vx * mv * dt; e.by += e.vy * mv * dt;
     const s = e.sway ? Math.sin(G.t * 4 + e.phase) * e.sway : 0;
     e.x = e.bx + e.px * s; e.y = e.by + e.py * s;
     e.dist = Math.hypot(e.x - CX, e.y - CY);
@@ -1406,7 +1474,7 @@ function update(dt){
       release(b); G.bullets.splice(i, 1); continue;
     }
     for (const e of G.enemies){
-      if (e.dead || b.hit.includes(e)) continue;
+      if (e.dead || e.cloaked || b.hit.includes(e)) continue;
       const dx = e.x - b.x, dy = e.y - b.y, rr = e.r + 5;
       if (dx*dx + dy*dy < rr*rr){
         release(b);
@@ -1731,6 +1799,7 @@ function drawEnemy(e){
   ctx.save();
   ctx.translate(e.x, e.y);
   if (e.kind === 'ghost') ctx.globalAlpha = .55 + Math.sin(G.t * 3 + e.phase) * .25;
+  if (e.cloak) ctx.globalAlpha = e.cloaked ? .18 : .9;   // Phantom: unangreifbar heißt auch kaum sichtbar
   ctx.fillStyle = e.flash > 0 ? '#fff' : e.color;
   ctx.shadowColor = e.color;
   ctx.shadowBlur = e.kind === 'boss' ? 26 : 10;
@@ -2077,6 +2146,10 @@ function renderList(){
     list.appendChild(buildStats());
     return;
   }
+  if (G.tab === 'bestiary'){
+    list.appendChild(buildBestiary());
+    return;
+  }
   if (G.tab === 'tal'){
     const head = document.createElement('h3');
     head.className = 'tal-head';
@@ -2361,6 +2434,43 @@ function buildStats(){
   return wrap;
 }
 
+// Grobe CSS-Silhouette je Canvas-Form, nur für die Übersicht im Menü
+const SHAPE_CLIP = {
+  tri:   'polygon(50% 0%, 6% 100%, 94% 100%)',
+  dart:  'polygon(100% 50%, 0% 90%, 25% 50%, 0% 10%)',
+  hex:   'polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0% 50%)',
+  blob:  'circle(46% at 50% 50%)',
+  shell: 'polygon(30% 0%, 90% 12%, 100% 50%, 90% 88%, 30% 100%, 0% 62%, 0% 38%)',
+  cross: 'polygon(35% 0%,65% 0%,65% 30%,100% 30%,100% 70%,65% 70%,65% 100%,35% 100%,35% 70%,0% 70%,0% 30%,35% 30%)',
+  star:  'polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)',
+};
+function buildBestiary(){
+  const wrap = document.createElement('div');
+  wrap.className = 'beast-grid';
+  const head = document.createElement('p');
+  head.className = 'spec-head';
+  head.textContent = 'Alle Angreifer, die dir begegnen können.';
+  wrap.appendChild(head);
+  const order = ['normal','fast','tank','splitter','shard','ghost','armor','regen','healer','gnat',
+                 'berserker','phantom','brood','boss'];
+  for (const kind of order){
+    const T = TYPES[kind];
+    if (!T) continue;
+    const spawn = SPAWN_TABLE.find(s => s.kind === kind);
+    const when = kind === 'shard' ? 'entsteht aus einem Spalter'
+      : kind === 'gnat' ? 'einzeln selten, sonst im Schwarm ab Welle 7'
+      : kind === 'boss' ? 'jede 10. Welle'
+      : spawn ? `ab Welle ${spawn.w}` : 'ab Welle 1';
+    const d = document.createElement('div');
+    d.className = 'beast-i';
+    d.innerHTML = `<span class="beast-d" style="clip-path:${SHAPE_CLIP[T.shape] || 'circle(46% at 50% 50%)'};background:${T.color}"></span>` +
+      `<span class="beast-n">${T.name}</span>` +
+      `<span class="beast-b">${T.desc}<br><i>${when}</i></span>`;
+    wrap.appendChild(d);
+  }
+  return wrap;
+}
+
 function plan(u){
   const l = S.lv[u.id];
   let count = 0, total = 0;
@@ -2577,7 +2687,8 @@ function extTrackText(id, kind){
   if (kind === 'cd') return `Aufladedauer: ${dec(extCdAt(id, s.cd))}s → ${dec(extCdAt(id, s.cd + 1))}s`;
   if (kind === 'extra'){
     const label = id === 'bolt' ? 'gleichzeitige Ziele'
-      : id === 'drone' ? 'Begleitschiffe' : 'gleichzeitige Richtungen';
+      : id === 'drone' ? 'Begleitschiffe'
+      : id === 'shock' ? 'Ringe hintereinander' : 'gleichzeitige Richtungen';
     return `+1 ${label}: ${1 + s.extra} → ${2 + s.extra}`;
   }
   return '';
@@ -2722,6 +2833,7 @@ function save(){
   try {
     storage.setItem(SAVE_KEY, JSON.stringify({
       v: 2, gold: S.gold, wave: S.wave, bestWave: S.bestWave, stars: S.stars, diff: S.diff,
+      rank: S.rank, rankPts: S.rankPts,
       lv: S.lv, sp: S.sp, tal: S.tal, ext: S.ext, crystals: S.crystals, aim: S.aim, cleared: S.cleared,
       chDone: S.chDone, ch: S.ch, chTime: S.chTime, done: S.done, st: S.st,
       autoBuy: S.autoBuy, sound: S.sound, ips: G.ips, at: Date.now(),
@@ -2744,6 +2856,8 @@ function load(){
   S.wave = Math.max(1, Math.floor(num(d.wave, 1)));
   S.bestWave = Math.max(S.wave, Math.floor(num(d.bestWave, 1)));
   S.stars = Math.floor(num(d.stars, 0));
+  S.rank = clamp(Math.floor(num(d.rank, 1)), 1, RANK_MAX);
+  S.rankPts = clamp(Math.floor(num(d.rankPts, 0)), 0, RANK_PTS_PER - 1);
   if (DIFFS.some(x => x.id === d.diff)) S.diff = d.diff;
   for (const u of UPGRADES){
     const l = Math.floor(num(d.lv && d.lv[u.id], 0));
@@ -2896,6 +3010,7 @@ function logHistory(text, kind){
 
 function renderUI(){
   $('gold').textContent = fmt(S.gold);
+  $('rank').textContent = S.rank;
   $('ips').textContent = fmt(G.ips);
   $('acc').textContent = G.shots > 20 ? Math.round(G.hits / G.shots * 100) + ' %' : '–';
 
