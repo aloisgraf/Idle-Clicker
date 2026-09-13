@@ -463,7 +463,7 @@ aside{position:fixed;left:0;right:0;bottom:0;z-index:7;width:100%;max-width:980p
     <div class="intro" id="extPick" hidden>
       <div class="intro-box">
         <h2>Erweiterung wählen</h2>
-        <p>Welle geschafft! Wähle eine von drei zufälligen Verbesserungen.</p>
+        <p id="extPickDesc">Welle geschafft! Wähle eine von drei zufälligen Verbesserungen.</p>
         <div class="diff-cards ext-cards" id="extCards"></div>
       </div>
     </div>
@@ -547,7 +547,7 @@ const C = {
   crystalBoss: 3,        // Kristalle pro besiegtem Boss
 };
 const SAVE_KEY = 'ringwache.v2';
-const VERSION = 5;   // von Hand bei jeder Änderung um 1 erhöhen
+const VERSION = 6;   // von Hand bei jeder Änderung um 1 erhöhen
 
 /* Schwierigkeitsstufen: Multiplikatoren auf das Grundspiel.
    fallback = Wellen zurück beim Schildbruch. */
@@ -828,7 +828,7 @@ const S = {
 };
 const G = {
   enemies:[], bullets:[], parts:[], texts:[], ripples:[], flashes:[], waves:[], grid:new Map(),
-  toSpawn:0, spawnT:0, spawnLeft:0, spawnMults:[], bossPending:false, pause:0, waveTotal:0, waveKilled:0,
+  toSpawn:0, spawnT:0, spawnLeft:0, spawnMults:[], pendingPicks:1, pickRoundTotal:1, bossPending:false, pause:0, waveTotal:0, waveKilled:0,
   cd:0, hp:10, shake:0, hitFlash:0, spin:0, t:0,
   acc:0, accT:0, ips:0, shots:0, hits:0, drones:[],
   autoT:0, tab:'spec', shopTab:'atk', panel:false, userPause:false, queued:0, pendGold:0, pendCry:0, syn:[], dend:[],
@@ -1109,6 +1109,7 @@ function payout(){
 function waveCleared(){
   G.queued = 0;
   payout();                                  // jetzt gibt es die Beute
+  const wasBoss = S.wave % C.bossEvery === 0;
   logHistory(`Welle ${S.wave} gewonnen`, 'win');
   G.goldRain = null;                         // ein etwaiger Goldregen ist jetzt ausgezahlt
   S.cleared = S.wave;                        // alles aus diesem Schub ist besiegt
@@ -1117,6 +1118,9 @@ function waveCleared(){
   S.st.bestEver = Math.max(S.st.bestEver || 1, S.wave);
   G.pause = 0.9;
   G.waves.push({ r: 30, life: .8 });
+  // Bosswelle geschafft: gleich 3 Erweiterungs-Auswahlen hintereinander statt nur einer.
+  G.pendingPicks = wasBoss ? 3 : 1;
+  G.pickRoundTotal = G.pendingPicks;
   offerExtensionPick();
 }
 function damageBase(amount, e){
@@ -1275,35 +1279,31 @@ function nearTarget(x, y, radius, exclude){
   return best;
 }
 const DRONE_ATTACK_RADIUS = 70;
-// Begleitschiffe fliegen frei zwischen dem äußeren Ring und dem
-// Erweiterungsring umher: sie steuern einen zufälligen Punkt in diesem Band
-// an, pausieren dort kurz und wählen dann den nächsten - das wirkt organisch
-// und bleibt nicht wie eine feste Kreisbahn an einem Rand hängen. Unabhängig
-// vom Flug greifen sie eigenständig alles in ihrem (kleinen) Zielradius an.
+// Begleitschiffe fliegen ohne Unterbrechung frei zwischen dem äußeren Ring
+// und dem Erweiterungsring umher: sobald sie einen zufälligen Wegpunkt in
+// diesem Band erreichen, geht es sofort weiter zum nächsten - kein Anhalten.
+// Unabhängig vom Flug greifen sie eigenständig alles in ihrem (kleinen)
+// Zielradius an.
 function updateDrones(dt){
   const want = extOwned('drone') ? 1 + S.ext.drone.extra : 0;
   while (G.drones.length < want){
     const ang = Math.random() * TAU, r = rangePx() + Math.random() * (extRingPx() - rangePx());
     const x = CX + Math.cos(ang) * r, y = CY + Math.sin(ang) * r;
-    G.drones.push({ x, y, a: ang, tx: x, ty: y, wait: .3, cd: Math.random() * .5, flash: 0 });
+    G.drones.push({ x, y, a: ang, tx: x, ty: y, cd: Math.random() * .5, flash: 0 });
   }
   if (G.drones.length > want) G.drones.length = want;
   const speed = 70;
   for (const d of G.drones){
     const ddx = d.tx - d.x, ddy = d.ty - d.y, distToTarget = Math.hypot(ddx, ddy);
     if (distToTarget < 10){
-      if (d.wait > 0) d.wait -= dt;
-      else {
-        const inner = rangePx(), outer = extRingPx();
-        // Nächster Wegpunkt nur mit kleinem Winkelsprung ab der aktuellen
-        // Position, sonst würde die gerade Strecke zwischen zwei weit
-        // auseinanderliegenden Punkten im Ring quer durch die Mitte schneiden.
-        const curAng = Math.atan2(d.y - CY, d.x - CX);
-        const ang = curAng + (Math.random() - .5) * 1.2;
-        const r = inner + Math.random() * Math.max(1, outer - inner);
-        d.tx = CX + Math.cos(ang) * r; d.ty = CY + Math.sin(ang) * r;
-        d.wait = .4 + Math.random() * .8;
-      }
+      const inner = rangePx(), outer = extRingPx();
+      // Nächster Wegpunkt nur mit kleinem Winkelsprung ab der aktuellen
+      // Position, sonst würde die gerade Strecke zwischen zwei weit
+      // auseinanderliegenden Punkten im Ring quer durch die Mitte schneiden.
+      const curAng = Math.atan2(d.y - CY, d.x - CX);
+      const ang = curAng + (Math.random() - .5) * 1.2;
+      const r = inner + Math.random() * Math.max(1, outer - inner);
+      d.tx = CX + Math.cos(ang) * r; d.ty = CY + Math.sin(ang) * r;
     } else {
       const vx = ddx / distToTarget * speed, vy = ddy / distToTarget * speed;
       d.x = clamp(d.x + vx * dt, 12, W - 12);
@@ -3035,7 +3035,7 @@ function extTrackText(id, kind, step){
       : id === 'spiral' ? 'Feuerarme' : 'gleichzeitige Richtungen';
     return `+${step} ${label}: ${1 + s.extra} → ${1 + step + s.extra}`;
   }
-  if (kind === 'reach') return `Reichweite: +${Math.round(e.reachStep * s.reach)}px → +${Math.round(e.reachStep * (s.reach + step))}px`;
+  if (kind === 'reach') return `Reichweite über den Erweiterungsring hinaus: +${Math.round(e.reachStep * s.reach)}px → +${Math.round(e.reachStep * (s.reach + step))}px`;
   if (kind === 'jump') return `Kettensprünge: ${s.jump} → ${s.jump + step}`;
   return '';
 }
@@ -3073,7 +3073,11 @@ function extPool(){
 
 function offerExtensionPick(){
   const pool = extPool();
-  if (!pool.length) return;               // alles ausgereizt: nichts anzubieten
+  if (!pool.length){                      // alles ausgereizt: nichts anzubieten
+    G.pendingPicks = 0;
+    $('extPick').hidden = true;
+    return;
+  }
   shuffleInPlace(pool);
   const box = $('extCards');
   box.innerHTML = '';
@@ -3103,7 +3107,23 @@ function offerExtensionPick(){
     b.addEventListener('click', () => pickExtCard(card));
     box.appendChild(b);
   }
+  // Nach einer Bosswelle gibt es 3 Runden hintereinander statt nur einer.
+  const total = G.pickRoundTotal || 1;
+  const roundNum = total - (G.pendingPicks || 1) + 1;
+  $('extPickDesc').textContent = total > 1
+    ? `Bosswelle geschafft! Runde ${roundNum} von ${total} – wähle eine von drei zufälligen Verbesserungen.`
+    : 'Welle geschafft! Wähle eine von drei zufälligen Verbesserungen.';
   $('extPick').hidden = false;
+}
+
+// Schließt die aktuelle Auswahl ab und öffnet bei einer Bosswelle sofort
+// die nächste von 3 Runden, statt das Fenster zu schließen.
+function finishPick(){
+  sfx('power');
+  G.pendingPicks = Math.max(0, (G.pendingPicks || 1) - 1);
+  save(); renderUI();
+  if (G.pendingPicks > 0) offerExtensionPick();
+  else $('extPick').hidden = true;
 }
 
 function pickExtCard(card){
@@ -3111,18 +3131,14 @@ function pickExtCard(card){
     G.hp = shieldMax();
     toast('Ringgesundheit vollständig aufgefüllt');
     logHistory('Ringgesundheit aufgefüllt', 'win');
-    sfx('power');
-    $('extPick').hidden = true;
-    save(); renderUI();
+    finishPick();
     return;
   }
   if (card.kind === 'goldrain'){
     G.goldRain = { mult: card.mult };
     toast(`Goldregen: ×${dec(card.mult)} Gold in dieser Welle`);
     logHistory(`Goldregen gewählt: ×${dec(card.mult)} Gold in der nächsten Welle`, 'ext');
-    sfx('power');
-    $('extPick').hidden = true;
-    save(); renderUI();
+    finishPick();
     return;
   }
   if (card.kind === 'ring'){
@@ -3130,9 +3146,7 @@ function pickExtCard(card){
     const gain = card.tier.step * RING_STEP;
     toast(`Erweiterungsring vergrößert: +${gain}px`);
     logHistory(`Erweiterungsring vergrößert: +${gain}px`, 'ext');
-    sfx('power');
-    $('extPick').hidden = true;
-    save(); renderUI();
+    finishPick();
     return;
   }
   const s = S.ext[card.ext], e = EXT[card.ext];
@@ -3146,9 +3160,7 @@ function pickExtCard(card){
   else if (card.kind === 'jump'){ s.jump = Math.min(e.jumpMax || 0, s.jump + step); msg = `${e.name}: +${step} Kettensprünge`; }
   toast(msg);
   logHistory(msg, 'ext');
-  sfx('power');
-  $('extPick').hidden = true;
-  save(); renderUI();
+  finishPick();
 }
 
 /* =========================================================
@@ -3520,9 +3532,19 @@ function renderUI(){
   let spent = 0;
   for (const t of TALENTS) spent += talSpent(t);
   $('pTitle').textContent = `Sterne: ${fmt(S.stars)} frei, ${fmt(spent)} verteilt`;
-  $('pDesc').textContent = gain > 0
-    ? `Welle ${S.bestWave} bringt ${gain} Sterne. Gold und Upgrades gehen verloren.`
-    : `Ab Welle ${C.prestigeMinWave} gibt es Sterne. Details im Reiter Sterne.`;
+  if (gain > 0){
+    // Genaue Vorher/Nachher-Prozente statt einer vagen Ankündigung: wie viel
+    // günstiger Verbesserungen durch die zusätzlichen Sterne werden.
+    const discountNow = (1 - costDiscount()) * 100;
+    const discountAfter = (1 - 1 / (1 + (S.st.starsTotal + gain) * 0.01)) * 100;
+    $('pDesc').textContent = `Welle ${S.bestWave} bringt ${gain} Sterne. `
+      + `Verbesserungen werden dadurch insgesamt ${dec(discountAfter)} % günstiger `
+      + `(statt bisher ${dec(discountNow)} %, also +${dec(discountAfter - discountNow)} Prozentpunkte). `
+      + `Dafür gehen Gold sowie alle Verbesserungs- und Erweiterungsstufen dieser Runde verloren `
+      + `(Sterne-Talente, Kristalle und Erfolge bleiben erhalten).`;
+  } else {
+    $('pDesc').textContent = `Ab Welle ${C.prestigeMinWave} gibt es Sterne. Details im Reiter Sterne.`;
+  }
   const pBtn = $('pBtn');
   if (gain > 0){
     pBtn.textContent = pConfirm ? 'Sicher? Nochmal' : `Neustart · ★ ${gain}`;
