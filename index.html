@@ -53,8 +53,9 @@ canvas{display:block;width:100%;height:100%;cursor:crosshair;touch-action:manipu
 .sub{color:var(--muted);font-size:.74rem;margin-top:3px;font-variant-numeric:tabular-nums;display:flex;gap:9px;flex-wrap:wrap;line-height:1.35}
 .sub b{color:var(--ink);font-weight:600}
 
-.top-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:auto}
-.wave-box{text-align:right;min-width:150px;display:block;transition:border-color .15s}
+.top-left{display:flex;flex-direction:column;gap:8px;pointer-events:auto}
+.top-right{display:flex;gap:8px;pointer-events:auto}
+.wave-box{text-align:left;min-width:150px;display:block;transition:border-color .15s}
 .wave-box:hover{border-color:var(--line-2)}
 .wave-box:active{transform:translateY(1px)}
 .rush-hint{color:var(--muted);opacity:.7;font-size:.66rem;margin-top:4px}
@@ -65,25 +66,25 @@ canvas{display:block;width:100%;height:100%;cursor:crosshair;touch-action:manipu
 .panel-toggle svg{width:15px;height:15px;color:var(--core)}
 .kbd{font-size:.62rem;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:0 5px;font-weight:400}
 
-.bottom-center{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:8px;align-items:center;pointer-events:auto;z-index:5}
+.bottom-stack{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:9px;pointer-events:auto;z-index:5;max-width:96vw}
 .panel-toggle.main{padding:8px 15px;font-size:.9rem;border-color:rgba(255,200,87,.45);box-shadow:0 0 26px rgba(255,200,87,.16),var(--shadow)}
 .panel-toggle.main:hover{border-color:var(--core)}
 .dim{position:absolute;inset:0;background:rgba(11,10,31,.45);pointer-events:none;z-index:3}
 .paused{font-size:.8rem;font-weight:600;color:var(--core);border:1px solid rgba(255,200,87,.45);border-radius:6px;padding:2px 7px;vertical-align:middle;margin-left:6px}
-.wave-top{display:flex;align-items:baseline;justify-content:flex-end;gap:8px}
+.wave-top{display:flex;align-items:baseline;justify-content:flex-start;gap:8px}
 .wave-num{font-size:1.05rem;font-weight:700;line-height:1}
 .tag{font-size:.62rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 5px;border-radius:5px;background:rgba(255,90,110,.18);color:var(--foe);border:1px solid rgba(255,90,110,.4)}
 .bar{height:4px;border-radius:2px;background:rgba(255,255,255,.1);margin-top:5px;overflow:hidden}
 .bar i{display:block;height:100%;border-radius:3px}
 .bar.wavebar i{background:var(--acc)}
 .bar.shieldbar i{background:var(--ring)}
-.meta{display:flex;justify-content:flex-end;color:var(--muted);font-size:.7rem;margin-top:3px;font-variant-numeric:tabular-nums}
+.meta{display:flex;justify-content:flex-start;color:var(--muted);font-size:.7rem;margin-top:3px;font-variant-numeric:tabular-nums}
 
 .stats-box{font-size:.74rem;color:var(--muted);display:grid;gap:3px;font-variant-numeric:tabular-nums}
 .stats-box b{color:var(--ink);font-weight:600}
 
-/* ---------- Fähigkeiten (Erweiterungs-Leiste, rechter Rand) ---------- */
-.abil{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:7px;pointer-events:auto;z-index:4}
+/* ---------- Fähigkeiten (Erweiterungs-Leiste, unten) ---------- */
+.abil{display:flex;flex-direction:row;flex-wrap:wrap;justify-content:center;gap:7px;pointer-events:auto}
 .ab{position:relative;width:62px;padding:6px 4px 5px;border-radius:11px;background:rgba(20,18,50,.72);border:1px solid var(--line);text-align:center;backdrop-filter:blur(8px);box-shadow:var(--shadow);transition:border-color .15s,transform .1s}
 .ab:hover{border-color:var(--line-2)}
 .ab:active{transform:translateY(1px)}
@@ -97,6 +98,22 @@ canvas{display:block;width:100%;height:100%;cursor:crosshair;touch-action:manipu
 .ab.locked{opacity:.55}
 .ab.locked .ab-ic{color:var(--muted)}
 .ab-cd{position:absolute;inset:0;border-radius:13px;background:rgba(11,10,31,.6);pointer-events:none;transition:height .15s linear}
+
+/* ---------- Normale Upgrades: immer sichtbare Leiste rechts, pausiert nicht ---------- */
+.side-shop{position:absolute;right:10px;top:96px;bottom:78px;width:250px;max-width:30vw;
+  display:flex;flex-direction:column;background:rgba(20,18,50,.72);border:1px solid var(--line);
+  border-radius:14px;backdrop-filter:blur(8px);box-shadow:var(--shadow);pointer-events:auto;
+  overflow:hidden;z-index:4}
+.shop-tabs{display:flex;gap:2px;padding:8px 8px 0;border-bottom:1px solid var(--line);flex:none}
+.shop-tabs button{flex:1;padding:7px 4px;font-size:.76rem;color:var(--muted);border-bottom:2px solid transparent;font-weight:500}
+.shop-tabs button[aria-selected="true"]{color:var(--ink);border-color:var(--core)}
+.shop-tabs button:hover{color:var(--ink)}
+.shop-seg{justify-content:center;margin:8px auto 0}
+.shop-list{flex:1 1 auto;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:7px}
+.shop-list .up{padding:8px 9px;gap:2px 9px}
+.shop-list .up .ic{width:28px;height:28px}
+.shop-list .up .ic svg{width:16px;height:16px}
+.shop-list .up-name{font-size:.88rem}
 
 .toast{position:absolute;left:50%;top:18%;transform:translate(-50%,-50%);font-size:1.1rem;font-weight:600;padding:10px 20px;border-radius:999px;background:rgba(11,10,31,.9);border:1px solid var(--line-2);opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;max-width:92%;box-shadow:var(--shadow)}
 .toast.show{opacity:1}
@@ -241,10 +258,17 @@ aside{position:fixed;left:0;right:0;bottom:0;z-index:7;width:100%;max-width:980p
   .gold-val{font-size:1.35rem}
   .wave-box{min-width:128px}
   .stats-box{display:none}
-  .abil{right:5px;gap:5px}
+  .abil{gap:5px}
   .ab{width:46px;padding:5px 3px 4px}
   .ab-n{display:none}
   .hud{padding:12px}
+  .side-shop{width:190px;max-width:52vw;top:172px;bottom:64px}
+  .shop-list .up{grid-template-columns:24px 1fr;padding:7px 8px}
+  .shop-list .up .ic{width:24px;height:24px}
+  .shop-list .up .ic svg{width:14px;height:14px}
+  .shop-list .up-name{font-size:.8rem}
+  .shop-list .up-lvl{font-size:.68rem}
+  .shop-list .up-val,.shop-list .up-cost{font-size:.7rem}
 }
 @media (prefers-reduced-motion:reduce){
   .up.bought,.bosswarn.show{animation:none}
@@ -259,24 +283,7 @@ aside{position:fixed;left:0;right:0;bottom:0;z-index:7;width:100%;max-width:980p
 
     <div class="hud">
       <div class="hud-top">
-        <div class="glass">
-          <div class="gold-box">
-            <span class="coin" aria-hidden="true"></span>
-            <span class="gold-val" id="gold">0</span>
-          </div>
-          <div class="sub">
-            <span><b id="ips">0</b> Gold/s</span>
-            <span>Treffer <b id="acc">–</b></span>
-            <span class="cry">◈ <b id="crystals">0</b></span>
-            <span class="pend" id="pending" hidden></span>
-          </div>
-          <div class="sub">
-            <span>Schuss <b id="dmgShot">0</b></span>
-            <span>Salve <b id="dmgSalve">0</b></span>
-            <span>Klick <b id="dmgClick">0</b></span>
-          </div>
-        </div>
-        <div class="top-right">
+        <div class="top-left">
           <button class="glass wave-box" id="waveBtn" title="Klick: nächste Welle sofort dazu holen">
           <div class="wave-top">
             <span class="tag chal" id="chalTag" hidden></span>
@@ -290,6 +297,33 @@ aside{position:fixed;left:0;right:0;bottom:0;z-index:7;width:100%;max-width:980p
           <div class="bar shieldbar" aria-hidden="true"><i id="hpFill"></i></div>
           <div class="meta"><span id="hpLabel">Schild 10 / 10</span></div>
           <div class="meta rush-hint" id="rushHint">tippen für nächste Welle</div>
+          </button>
+          <div class="glass">
+            <div class="gold-box">
+              <span class="coin" aria-hidden="true"></span>
+              <span class="gold-val" id="gold">0</span>
+            </div>
+            <div class="sub">
+              <span><b id="ips">0</b> Gold/s</span>
+              <span>Treffer <b id="acc">–</b></span>
+              <span class="cry">◈ <b id="crystals">0</b></span>
+              <span class="pend" id="pending" hidden></span>
+            </div>
+            <div class="sub">
+              <span>Schuss <b id="dmgShot">0</b></span>
+              <span>Salve <b id="dmgSalve">0</b></span>
+              <span>Klick <b id="dmgClick">0</b></span>
+            </div>
+          </div>
+        </div>
+        <div class="top-right">
+          <button class="glass panel-toggle" id="pauseBtn" title="Pause (Taste P)" aria-pressed="false">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h3v12H6zM11 4h3v12h-3z"/></svg>
+            <span class="kbd">P</span>
+          </button>
+          <button class="glass panel-toggle" id="fsBtn" title="Vollbild (Taste F)">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3H3v4M13 3h4v4M13 17h4v-4M7 17H3v-4"/></svg>
+            <span class="kbd">F</span>
           </button>
         </div>
       </div>
@@ -305,23 +339,28 @@ aside{position:fixed;left:0;right:0;bottom:0;z-index:7;width:100%;max-width:980p
           <span>Spielzeit <b id="stTime">0 Min.</b></span>
         </div>
       </div>
-
-      <div class="abil" id="extBar" aria-label="Erweiterungen"></div>
     </div>
 
-    <div class="bottom-center">
+    <div class="side-shop" id="sideShop" aria-label="Upgrades">
+      <div class="shop-tabs" role="tablist">
+        <button role="tab" data-shoptab="atk" aria-selected="true">Angriff</button>
+        <button role="tab" data-shoptab="def" aria-selected="false">Abwehr</button>
+        <button role="tab" data-shoptab="eco" aria-selected="false">Gold</button>
+      </div>
+      <div class="seg shop-seg" role="group" aria-label="Kaufmenge">
+        <button data-n="1" aria-pressed="true">×1</button>
+        <button data-n="10" aria-pressed="false">×10</button>
+        <button data-n="max" aria-pressed="false">Max</button>
+      </div>
+      <div class="shop-list" id="sideList"></div>
+    </div>
+
+    <div class="bottom-stack">
+      <div class="abil" id="extBar" aria-label="Erweiterungen"></div>
       <button class="glass panel-toggle main" id="panelBtn" aria-expanded="false">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 16V4M5 9l5-5 5 5"/></svg>
-        <span>Upgrades</span>
+        <span>Menü</span>
         <span class="kbd">U</span>
-      </button>
-      <button class="glass panel-toggle" id="pauseBtn" title="Pause (Taste P)" aria-pressed="false">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h3v12H6zM11 4h3v12h-3z"/></svg>
-        <span class="kbd">P</span>
-      </button>
-      <button class="glass panel-toggle" id="fsBtn" title="Vollbild (Taste F)">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3H3v4M13 3h4v4M13 17h4v-4M7 17H3v-4"/></svg>
-        <span class="kbd">F</span>
       </button>
     </div>
     <div class="dim" id="dim" hidden></div>
@@ -350,7 +389,7 @@ aside{position:fixed;left:0;right:0;bottom:0;z-index:7;width:100%;max-width:980p
     <div class="brand">
       <h1>Ringwache <span class="paused">pausiert</span></h1>
       <div class="icons">
-        <button class="iconbtn" id="closeBtn" title="Upgrades ausblenden und weiterspielen (U oder Esc)">
+        <button class="iconbtn" id="closeBtn" title="Menü ausblenden und weiterspielen (U oder Esc)">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5l10 10M15 5L5 15"/></svg>
         </button>
         <button class="iconbtn" id="autoBtn" aria-pressed="false" title="Auto-Kauf: kauft laufend das günstigste Upgrade">
@@ -363,19 +402,11 @@ aside{position:fixed;left:0;right:0;bottom:0;z-index:7;width:100%;max-width:980p
     </div>
 
     <div class="ctrl">
-      <div class="seg" role="group" aria-label="Kaufmenge">
-        <button data-n="1" aria-pressed="true">×1</button>
-        <button data-n="10" aria-pressed="false">×10</button>
-        <button data-n="max" aria-pressed="false">Max</button>
-      </div>
       <span class="chip"><b id="diffLabel">Normal</b><button id="diffBtn">ändern</button></span>
     </div>
 
     <div class="tabs" role="tablist">
-      <button role="tab" data-tab="atk" aria-selected="true">Angriff</button>
-      <button role="tab" data-tab="def" aria-selected="false">Abwehr</button>
-      <button role="tab" data-tab="eco" aria-selected="false">Gold</button>
-      <button role="tab" data-tab="spec" aria-selected="false">Kristalle</button>
+      <button role="tab" data-tab="spec" aria-selected="true">Kristalle</button>
       <button role="tab" data-tab="tal" aria-selected="false">Sterne</button>
       <button role="tab" data-tab="chal" aria-selected="false">Aufgaben</button>
       <button role="tab" data-tab="ach" aria-selected="false">Erfolge</button>
@@ -654,7 +685,7 @@ const G = {
   toSpawn:0, spawnT:0, spawnLeft:0, bossPending:false, pause:0, waveTotal:0, waveKilled:0,
   cd:0, hp:10, shake:0, hitFlash:0, spin:0, t:0,
   acc:0, accT:0, ips:0, shots:0, hits:0, drones:[],
-  autoT:0, tab:'atk', panel:false, userPause:false, queued:0, pendGold:0, pendCry:0, syn:[], dend:[],
+  autoT:0, tab:'spec', shopTab:'atk', panel:false, userPause:false, queued:0, pendGold:0, pendCry:0, syn:[], dend:[],
   ext:{ shock:{cd:0}, bolt:{cd:0}, spiral:{cd:0, angle:0}, dirshot:{cd:0} },
   shocks:[], bolts:[], spiralShots:[], beams:[],
 };
@@ -1960,6 +1991,7 @@ function draw(){
    12. Seitenleiste: Upgrades und Erfolge
    ========================================================= */
 const list = $('list');
+const sideList = $('sideList');
 const upEls = {};
 for (const u of UPGRADES){
   const b = document.createElement('button');
@@ -1970,6 +2002,9 @@ for (const u of UPGRADES){
     `<span class="up-val"></span><span class="up-cost"></span>`;
   b.addEventListener('click', () => buy(u));
   upEls[u.id] = { b, lvl: b.querySelector('.up-lvl'), val: b.querySelector('.up-val'), cost: b.querySelector('.up-cost') };
+  // Alle liegen dauerhaft in der immer sichtbaren, nicht pausierenden
+  // Kauf-Leiste rechts; renderUpgrades() blendet per Tab nur die passenden ein.
+  sideList.appendChild(b);
 }
 
 function renderList(){
@@ -2022,10 +2057,7 @@ function renderList(){
     list.appendChild(head);
     for (const x of SPECIALS) list.appendChild(specEls[x.id].b);
     renderSpecials();
-    return;
   }
-  for (const u of UPGRADES) if (u.cat === G.tab) list.appendChild(upEls[u.id].b);
-  renderUpgrades();
 }
 
 /* Zielpriorität */
@@ -2320,8 +2352,10 @@ function buy(u, silent){
 
 function renderUpgrades(){
   for (const u of UPGRADES){
-    if (u.cat !== G.tab) continue;
-    const e = upEls[u.id], l = S.lv[u.id], maxed = l >= u.max;
+    const e = upEls[u.id];
+    e.b.hidden = u.cat !== G.shopTab;   // alle liegen dauerhaft in #sideList, nur der Tab wechselt
+    if (u.cat !== G.shopTab) continue;
+    const l = S.lv[u.id], maxed = l >= u.max;
     e.b.classList.toggle('maxed', maxed);
     e.lvl.textContent = maxed ? `Stufe ${l} · voll` : `Stufe ${l}`;
     if (maxed){
@@ -2348,6 +2382,15 @@ document.querySelectorAll('.seg button').forEach(btn => {
   btn.addEventListener('click', () => {
     S.buyMode = btn.dataset.n === 'max' ? 'max' : Number(btn.dataset.n);
     document.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-pressed', String(x === btn)));
+    renderUpgrades();
+  });
+});
+// Die normalen Upgrades leben in der immer sichtbaren Leiste rechts und
+// haben deshalb ihren eigenen, vom Menü (G.tab) unabhängigen Tab-Zustand.
+document.querySelectorAll('.shop-tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    G.shopTab = btn.dataset.shoptab;
+    document.querySelectorAll('.shop-tabs button').forEach(x => x.setAttribute('aria-selected', String(x === btn)));
     renderUpgrades();
   });
 });
@@ -2595,15 +2638,37 @@ $('pBtn').addEventListener('click', () => {
 /* =========================================================
    15. Spielstand
    ========================================================= */
+// Spielstand liegt in einem Cookie statt in localStorage. Cookies sind auf
+// rund 4 KB je Eintrag begrenzt; ein Speicherstand mit allen Erfolgen,
+// Aufgaben, Talenten und Erweiterungen ausgereizt liegt selbst dann noch bei
+// gut der Hälfte davon, aber setItem() lehnt zu große Werte lieber ab, statt
+// ein Cookie zu schreiben, das der Browser stillschweigend kappen würde.
+const COOKIE_MAX = 3800;
+const cookieStorage = {
+  getItem(key){
+    const m = document.cookie.match(new RegExp('(?:^|; )' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : null;
+  },
+  setItem(key, value){
+    const enc = encodeURIComponent(value);
+    if (enc.length > COOKIE_MAX) throw new Error('Spielstand zu groß für ein Cookie');
+    document.cookie = `${key}=${enc}; max-age=31536000; path=/; SameSite=Lax`;
+  },
+  removeItem(key){
+    document.cookie = `${key}=; max-age=0; path=/`;
+  },
+};
 let storage = null;
 try {
-  localStorage.setItem(SAVE_KEY + '.test', '1');
-  localStorage.removeItem(SAVE_KEY + '.test');
-  storage = localStorage;
+  cookieStorage.setItem(SAVE_KEY + '.test', '1');
+  const ok = cookieStorage.getItem(SAVE_KEY + '.test') === '1';
+  cookieStorage.removeItem(SAVE_KEY + '.test');
+  storage = ok ? cookieStorage : null;
 } catch (err){ storage = null; }
 
+let saveSuspended = false;
 function save(){
-  if (!storage) return;
+  if (!storage || saveSuspended) return;
   try {
     storage.setItem(SAVE_KEY, JSON.stringify({
       v: 2, gold: S.gold, wave: S.wave, bestWave: S.bestWave, stars: S.stars, diff: S.diff,
@@ -2735,6 +2800,7 @@ function importSave(){
   if (!data || (data.v !== 1 && data.v !== 2)){ toast('Unbekannte Spielstand-Version'); return; }
   if (!confirm('Diesen Spielstand laden? Dein aktueller Fortschritt wird überschrieben.')) return;
   try { storage.setItem(SAVE_KEY, raw); } catch (err){ toast('Speichern nicht möglich'); return; }
+  saveSuspended = true;               // sonst überschreibt pagehide den Import vor dem Reload wieder
   location.reload();
 }
 
@@ -2743,6 +2809,9 @@ $('importBtn').addEventListener('click', importSave);
 
 $('wipeBtn').addEventListener('click', () => {
   if (!confirm('Spielstand wirklich löschen? Gold, Wellen, Upgrades, Erfolge und Sterne sind dann weg.')) return;
+  // Reload löst noch pagehide/visibilitychange aus, die sonst den gerade
+  // gelöschten Stand aus dem laufenden Speicher sofort neu schreiben würden.
+  saveSuspended = true;
   if (storage){ try { storage.removeItem(SAVE_KEY); } catch (err){} }
   location.reload();
 });
@@ -2773,6 +2842,7 @@ function renderUI(){
   $('wave').textContent = `Welle ${S.wave}`;
   $('pausedTag').hidden = !G.userPause;
   renderExtBar();
+  renderUpgrades();   // immer sichtbare Kauf-Leiste: Preise/Werte laufend aktuell halten
   $('boss').hidden = S.wave % C.bossEvery !== 0;
   const cq = $('chalTag');
   if (S.ch && CH[S.ch]){
@@ -2822,8 +2892,6 @@ function renderUI(){
     if (G.panel && S.ch) renderList();
   } else if (G.tab === 'spec'){
     renderSpecials();
-  } else if (G.tab !== 'ach'){
-    renderUpgrades();
   }
 
   const gain = prestigeGain();
@@ -2866,7 +2934,7 @@ setPanel(false);                             // eingeklappt starten, Spiel läuf
 renderUI();
 if (offline) toast(`${awayText(offline.sec)} weg: +${fmt(offline.earned)} Gold`, 5000);
 else if (loaded) toast('Willkommen zurück', 2500);
-else setTimeout(() => toast('Upgrades: Knopf oben rechts oder Taste U', 4000), 1200);
+else setTimeout(() => toast('Normale Upgrades: Leiste rechts. Weiteres im Menü unten (Taste U)', 4000), 1200);
 
 let last = performance.now(), uiT = 0, saveT = 0;
 let errCount = 0;
