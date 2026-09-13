@@ -542,7 +542,7 @@ const C = {
   crystalBoss: 3,        // Kristalle pro besiegtem Boss
 };
 const SAVE_KEY = 'ringwache.v2';
-const VERSION = 3;   // von Hand bei jeder Änderung um 1 erhöhen
+const VERSION = 4;   // von Hand bei jeder Änderung um 1 erhöhen
 
 /* Schwierigkeitsstufen: Multiplikatoren auf das Grundspiel.
    fallback = Wellen zurück beim Schildbruch. */
@@ -580,8 +580,8 @@ const TYPES = {
   armor:    { r:18, hp:2.2, speed:.7,   reward:2.4, dmg:2, color:'#7fb3ff', shape:'shell', armor:.55,
     name:'Gepanzert', desc:'Schluckt einen Teil jedes Treffers. Volltreffer lohnen sich hier besonders.' },
   // Heiler: heilt alle Gegner in der Nähe, zuerst ausschalten
-  healer:   { r:15, hp:1.6, speed:.65,  reward:2.6, dmg:1, color:'#6ee7a8', shape:'cross', heal:.05, healR:150,
-    name:'Heiler', desc:'Heilt regelmäßig alle Gegner in seiner Nähe. Zuerst ausschalten.' },
+  healer:   { r:15, hp:1.6, speed:.65,  reward:2.6, dmg:1, color:'#6ee7a8', shape:'cross', heal:.10, healR:150,
+    name:'Heiler', desc:'Bleibt am äußeren Ring stehen, in Schussweite, und heilt von dort aus alle Gegner in seiner Nähe. Zuerst ausschalten.' },
   // Regenerator: heilt sich selbst, wenn er zwei Sekunden nicht getroffen wurde
   regen:    { r:16, hp:1.5, speed:.85,  reward:2,   dmg:1, color:'#ffd166', shape:'hex',   regen:.12,
     name:'Regenerierer', desc:'Heilt sich selbst, sobald er zwei Sekunden nicht getroffen wurde.' },
@@ -1261,33 +1261,42 @@ function nearTarget(x, y, radius, exclude){
   });
   return best;
 }
-const DRONE_ATTACK_RADIUS = 170;
-// Begleitschiffe bewegen sich frei zwischen dem äußeren Ring und dem
-// Erweiterungsring und feuern eigenständig auf Ziele in ihrer Nähe
-// (Erweiterung "drone").
+const DRONE_ATTACK_RADIUS = 70;
+// Begleitschiffe fliegen frei zwischen dem äußeren Ring und dem
+// Erweiterungsring umher: sie steuern einen zufälligen Punkt in diesem Band
+// an, pausieren dort kurz und wählen dann den nächsten - das wirkt organisch
+// und bleibt nicht wie eine feste Kreisbahn an einem Rand hängen. Unabhängig
+// vom Flug greifen sie eigenständig alles in ihrem (kleinen) Zielradius an.
 function updateDrones(dt){
   const want = extOwned('drone') ? 1 + S.ext.drone.extra : 0;
   while (G.drones.length < want){
     const ang = Math.random() * TAU, r = rangePx() + Math.random() * (extRingPx() - rangePx());
-    G.drones.push({ x: CX + Math.cos(ang) * r, y: CY + Math.sin(ang) * r, a: ang, wander: Math.random() * TAU, cd: Math.random() * .5, flash: 0 });
+    const x = CX + Math.cos(ang) * r, y = CY + Math.sin(ang) * r;
+    G.drones.push({ x, y, a: ang, tx: x, ty: y, wait: .3, cd: Math.random() * .5, flash: 0 });
   }
   if (G.drones.length > want) G.drones.length = want;
-  const inner = rangePx(), outer = extRingPx(), speed = 95;
+  const speed = 70;
   for (const d of G.drones){
-    // Sanfter Zufallsflug statt starrer Kreisbahn, mit weichem Zurücklenken
-    // ins erlaubte Band, sobald das Schiff zu nah an den Kern kommt oder
-    // über den Erweiterungsring hinausfliegt.
-    d.wander += (Math.random() - .5) * 1.8 * dt;
-    let dx = Math.cos(d.wander), dy = Math.sin(d.wander);
-    const dist = Math.hypot(d.x - CX, d.y - CY) || 1;
-    const nx = (d.x - CX) / dist, ny = (d.y - CY) / dist;
-    if (dist < inner){ dx += nx * 1.6; dy += ny * 1.6; }
-    else if (dist > outer){ dx -= nx * 1.6; dy -= ny * 1.6; }
-    const len = Math.hypot(dx, dy) || 1;
-    const vx = dx / len * speed, vy = dy / len * speed;
-    d.x = clamp(d.x + vx * dt, 12, W - 12);
-    d.y = clamp(d.y + vy * dt, 12, H - 12);
-    d.a = Math.atan2(vy, vx);
+    const ddx = d.tx - d.x, ddy = d.ty - d.y, distToTarget = Math.hypot(ddx, ddy);
+    if (distToTarget < 10){
+      if (d.wait > 0) d.wait -= dt;
+      else {
+        const inner = rangePx(), outer = extRingPx();
+        // Nächster Wegpunkt nur mit kleinem Winkelsprung ab der aktuellen
+        // Position, sonst würde die gerade Strecke zwischen zwei weit
+        // auseinanderliegenden Punkten im Ring quer durch die Mitte schneiden.
+        const curAng = Math.atan2(d.y - CY, d.x - CX);
+        const ang = curAng + (Math.random() - .5) * 1.2;
+        const r = inner + Math.random() * Math.max(1, outer - inner);
+        d.tx = CX + Math.cos(ang) * r; d.ty = CY + Math.sin(ang) * r;
+        d.wait = .4 + Math.random() * .8;
+      }
+    } else {
+      const vx = ddx / distToTarget * speed, vy = ddy / distToTarget * speed;
+      d.x = clamp(d.x + vx * dt, 12, W - 12);
+      d.y = clamp(d.y + vy * dt, 12, H - 12);
+      d.a = Math.atan2(vy, vx);
+    }
 
     d.cd = Math.max(0, d.cd - dt);
     if (d.cd <= 0 && !chRule('noDrone')){
@@ -1629,8 +1638,10 @@ function update(dt){
       e.cloakT -= dt;
       if (e.cloakT <= 0){ e.cloaked = !e.cloaked; e.cloakT = e.cloaked ? 1.2 : 1.8; }
     }
-    // Berserker wird schneller, je weniger Leben ihm bleibt
-    const mv = e.enrage ? 1 + e.enrage * (1 - e.hp / e.maxHp) : 1;
+    // Berserker wird schneller, je weniger Leben ihm bleibt; Heiler bleibt
+    // am äußeren Ring stehen (noch in Schussweite) statt bis zum Kern vorzurücken
+    const stopped = e.heal && e.dist <= rangePx();
+    const mv = stopped ? 0 : e.enrage ? 1 + e.enrage * (1 - e.hp / e.maxHp) : 1;
     e.bx += e.vx * mv * dt; e.by += e.vy * mv * dt;
     const s = e.sway ? Math.sin(G.t * 4 + e.phase) * e.sway : 0;
     e.x = e.bx + e.px * s; e.y = e.by + e.py * s;
